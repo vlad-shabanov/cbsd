@@ -34,11 +34,15 @@ ${H3_COLOR}Options${N0_COLOR}:
 
 ${H3_COLOR}Examples${N0_COLOR}:
 
+ # cbsd jrctl
  # cbsd jrctl human=0
  # cbsd jrctl display=jname,openfiles,memoryuse,fsquota sort=memoryuse
+ # cbsd jrctl mode=show jname=xxx prometheus=1
+ # cbsd jrctl jname=jail1
 
 ${H3_COLOR}See also${N0_COLOR}:
 
+ cbsd jrctl-tui --help
  cbsd jget --help
 
 "
@@ -52,7 +56,8 @@ EXTHELP="wf_jrctl"
 
 sort=
 quiet=
-
+jname=
+ojname=
 . ${cbsdinit}
 
 [ -z "${quiet}" ] && quiet=1
@@ -168,26 +173,28 @@ populate_output_data()
 # $1 - which file from. Eg: local
 show_jaildata_from_sql()
 {
-	local _i _sqlq
+	local _i= _sqlq=
+	local _res=
+	local jname=
 
-	#   set sqlfile for ". rcconf" including
+	# set sqlfile for ". rcconf" including
 	if [ -n "${1}" ]; then
 		sqlfile="${1}"
 	else
 		sqlfile="local"
 	fi
 
-	if [ -n "${jname}" ]; then
-		_sqlq="cbsdsqlro ${sqlfile} \"SELECT jname FROM jails WHERE jname='${jname}' AND emulator = 'bhyve' OR emulator = 'jail'\""
+	if [ -n "${ojname}" ]; then
+		_res=$( cbsdsqlro ${sqlfile} "SELECT jname FROM jails WHERE jname= '${ojname}'" )
 	else
 		if [ -n "${emulator}" ]; then
-			_sqlq="cbsdsqlro ${sqlfile} \"SELECT jname FROM jails WHERE emulator = '${emulator}' ORDER BY jname ASC\""
+			_res=$( cbsdsqlro ${sqlfile} "SELECT jname FROM jails WHERE emulator = '${emulator}' ORDER BY jname ASC" )
 		else
-			_sqlq="cbsdsqlro ${sqlfile} \"SELECT jname FROM jails WHERE emulator = 'bhyve' OR emulator = 'jail' ORDER BY jname ASC\""
+			_res=$( cbsdsqlro ${sqlfile} "SELECT jname FROM jails WHERE emulator = 'bhyve' OR emulator = 'jail' ORDER BY jname ASC" )
 		fi
 	fi
 
-	${_sqlq} | while read jname; do
+	for jname in ${_res}; do
 		_status=""
 		. ${subrdir}/rctl.subr
 		. ${subrdir}/rcconf.subr
@@ -587,8 +594,10 @@ done
 
 #### MAIN
 if [ -n "${jname}" ]; then
+	# support for multi/node-sqlite?
 	. ${subrdir}/rcconf.subr
 	[ $? -eq 1 ] && err 1 "${N1_COLOR}No such jail: ${N2_COLOR}${jname}${N0_COLOR}"
+	ojname="${jname}"
 fi
 
 case "${emulator}" in
