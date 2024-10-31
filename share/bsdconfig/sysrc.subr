@@ -596,8 +596,8 @@ f_sysrc_set()
 #		return $FAILURE
 #	fi
 
-        local tmpfile="$( mktemp )"
-        [ "$tmpfile" ] || return $FAILURE
+	local tmpfile="$( mktemp )"
+	[ "$tmpfile" ] || return $FAILURE
 
 
 	#
@@ -606,10 +606,29 @@ f_sysrc_set()
 	# temporary file over the destination, the destination will inherit the
 	# permissions from the temporary file).
 	#
-#	local mode
+	local mode
+	local owner
+
 #	f_eval_catch -dk mode $funcname stat 'stat -f "%%#Lp" "%s"' "$file" ||
 #		mode=0644
 #	f_eval_catch -d $funcname chmod 'chmod "%s" "%s"' "$mode" "$tmpfile"
+
+	case $( uname -s ) in
+		Linux)
+			mode=$( stat -c "%a" ${file} 2>/dev/null )
+			owner=$( stat -c "%u:%g" ${file} 2>/dev/null )
+			;;
+		*)
+			mode=$( stat -f "%Lp" ${file} 2>/dev/null )
+			owner=$( stat -f "%u:%g" ${file} 2>/dev/null )
+			;;
+	esac
+
+	[ -z "${mode}" ] && mode="0644"
+	[ -z "${owner}" ] && mode="0:0"
+
+	chmod ${mode} ${tmpfile}
+	chown ${owner} ${tmpfile}
 
 	#
 	# Fixup ownership. The destination file _is_ writable (we tested
