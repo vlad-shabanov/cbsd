@@ -837,10 +837,8 @@ phase5()
 	[ -z "${natip}" ] && natip="auto"
 	[ -z "${natip6}" ] && natip6="auto"
 	[ -z "${nodeippool}" ] && nodeippool="auto"
-
 	#system information
 	. ${toolsdir}/sysinv
-
 	update_netinfo
 
 	init_items_desc
