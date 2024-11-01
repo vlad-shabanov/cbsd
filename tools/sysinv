@@ -401,4 +401,5 @@ if [ "${mode}" = "update" ]; then
 	${CHMOD_CMD} 0640 ${inventory} && ${CHOWN_CMD} ${cbsduser}:${cbsduser} ${inventory}
 fi
 
-exit 0
+# don't use exit here: included from initenv
+#exit 0
