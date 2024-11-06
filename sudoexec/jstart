@@ -866,10 +866,37 @@ if [ ${vnet} -eq 1 ]; then
 		IFS="${OIFS}"
 		${IFCONFIG_CMD} ${i} up
 		# we need setup lock here due to ethX name possible conflict with other jail
+		_wait_count=0
 		while [ -r ${tmpdir}/eth${eth_seq}.locked ]; do
-			[ ${quiet} -ne 1 ] && ${ECHO} "${N1_COLOR}jstart: eth${eth_seq} locked, waiting..${N0_COLOR}"
+
+			_cur_time=$( ${DATE_CMD} +%s )
+			eval $( ${STAT_CMD} -s ${tmpdir}/eth${eth_seq}.locked )
+			_diff_time=$(( _cur_time - st_mtime ))
+
+			if [ ${_diff_time} -gt 8 ]; then
+				${IFCONFIG_CMD} eth${eth_seq} > /dev/null 2>&1
+				_ret=$?
+				if [ ${_ret} -ne 0 ]; then
+					# remove orphaned lock
+					${RM_CMD} -f ${tmpdir}/eth${eth_seq}.locked
+					break
+				fi
+			fi
+
+			[ ${quiet} -ne 1 ] && ${ECHO} "${N1_COLOR}jstart: eth${eth_seq} locked (${_diff_time}), waiting (${_wait_count}/12)..${N0_COLOR}"
+
+			_wait_count=$(( _wait_count + 1 ))
+
+			if [ ${_wait_count} -gt 12 ]; then
+				_res=$( ${CAT_CMD} ${tmpdir}/eth${eth_seq}.locked )
+				jstop jname=${jname} fast=1
+				${IFCONFIG_CMD} ${i} destroy
+				log_err 1 "${N1_COLOR}${CBSD_APP}: waiting for unlock: still locked by [${_res}]: ${N2_COLOR}${tmpdir}/eth${eth_seq}.locked${N0_COLOR}"
+			fi
+
 			sleep 1
 		done
+
 		# make lock
 		echo "${jname}" > ${tmpdir}/eth${eth_seq}.locked
 		${IFCONFIG_CMD} ${i} name eth${eth_seq} && ${IFCONFIG_CMD} eth${eth_seq} vnet ${jname}
