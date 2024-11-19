@@ -1,5 +1,6 @@
 #!/usr/local/bin/cbsd
 #v12.0.4
+CBSDMODULE="jail"
 MYARG="mode"
 MYOPTARG="chroot epw fromfile fullname group jname login pw secgroup shell uid"
 MYDESC="Manage user and password in jail/chroot environment"
