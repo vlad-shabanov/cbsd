@@ -5,15 +5,22 @@
 
 jails_stop()
 {
-	local localjails= localvms=
+	local localjails=
+	local localbhyves=
+	local localxens=
+	local localqemus=
 
 	localjails="$( jorder order=DESC )"
-	localvms="$( border order=DESC )"
+	localbhyves="$( border order=DESC )"
+	localxens="$( xorder order=DESC )"
+	localqemus="$( qorder order=DESC )"
 
 	[ -n "${localjails}" ] && cbsdlogger NOTICE ${CBSD_APP}: jail stop order: ${localjails}
-	[ -n "${localvms}" ] && cbsdlogger NOTICE ${CBSD_APP}: bhyve vm stop order: ${localvms}
+	[ -n "${localbhyves}" ] && cbsdlogger NOTICE ${CBSD_APP}: bhyve vm stop order: ${localbhyves}
+	[ -n "${localxens}" ] && cbsdlogger NOTICE ${CBSD_APP}: XEN vm stop order: ${localxens}
+	[ -n "${localqemus}" ] && cbsdlogger NOTICE ${CBSD_APP}: QEMU vm stop order: ${localqemus}
 
-	for jname in ${localjails} ${localvms}; do
+	for jname in ${localjails} ${localbhyves} ${localxens} ${localqemus}; do
 		. ${subrdir}/rcconf.subr
 		[ ${jid} -eq 0 ] && continue
 		stoppid="${ftmpdir}/stop.${jname}.$$"
@@ -25,6 +32,12 @@ jails_stop()
 				;;
 			jail)
 				env TERM=xterm /usr/local/cbsd/misc/daemonize -E TERM=xterm -p ${stoppid} /usr/local/cbsd/jailctl/jstop name=${jname}
+				;;
+			xen)
+				env TERM=xterm /usr/local/cbsd/misc/daemonize -E TERM=xterm -p ${stoppid} /usr/local/cbsd/bhyvectl/xstop jname=${jname}
+				;;
+			qemu)
+				env TERM=xterm /usr/local/cbsd/misc/daemonize -E TERM=xterm -p ${stoppid} /usr/local/cbsd/bhyvectl/qstop jname=${jname}
 				;;
 		esac
 		# lets save .pid file
@@ -40,17 +53,24 @@ jails_stop()
 
 jails_start()
 {
-	local jlist
-	local blist
-	local localjails= localvms=
+	local jlist=
+	local blist=
+	local qlist=
+	local xlist=
+	local localjails= localbhyves= localxens= localqemus=
 
 	localjails="$( jorder order=ASC )"
-	localvms="$( border order=ASC )"
+	localbhyves="$( border order=ASC )"
+	localxens="$( xorder order=ASC )"
+	localqemus="$( qorder order=ASC )"
 
 	[ -n "${localjails}" ] && cbsdlogger NOTICE ${CBSD_APP}: jail start order: ${localjails}
-	[ -n "${localvms}" ] && cbsdlogger NOTICE ${CBSD_APP}: bhyve vm start order: ${localvms}
+	[ -n "${localbhyves}" ] && cbsdlogger NOTICE ${CBSD_APP}: bhyve vm start order: ${localbhyves}
+	[ -n "${localqemus}" ] && cbsdlogger NOTICE ${CBSD_APP}: QEMU vm start order: ${localqemus}
+	[ -n "${localxens}" ] && cbsdlogger NOTICE ${CBSD_APP}: XEN vm start order: ${localxens}
 
-	for jname in ${localjails} ${localvms}; do
+	for jname in ${localjails} ${localbhyves} ${localxens} ${localqemus}; do
+		${toolsdir}/save-jail-info jname=${jname}
 		. ${subrdir}/rcconf.subr
 		if [ ${astart} -ne 1 ]; then
 			cbsdlogger NOTICE ${CBSD_APP}: astart=0, skip: ${jname}
@@ -58,15 +78,26 @@ jails_start()
 		else
 			cbsdlogger NOTICE ${CBSD_APP}: astart=1, start scheduled: ${jname}
 		fi
-		if [ "${emulator}" = "bhyve" ]; then
-			blist="${blist} ${jname}"
-		else
-			jlist="${jlist} ${jname}"
-		fi
+		case "${emulator}" in
+			bhyve)
+				blist="${blist} ${jname}"
+				;;
+			jail)
+				jlist="${jlist} ${jname}"
+				;;
+			qemu)
+				qlist="${qlist} ${jname}"
+				;;
+			xen)
+				xlist="${xlist} ${jname}"
+				;;
+		esac
 	done
 
 	[ -n "${jlist}" ] && task mode=new autoflush=0 notify=0 owner=syscbsd /usr/local/bin/cbsd jstart inter=0 ${jlist}
 	[ -n "${blist}" ] && task mode=new autoflush=0 notify=0 owner=syscbsd /usr/local/bin/cbsd bstart inter=0 ${blist}
+	[ -n "${qlist}" ] && task mode=new autoflush=0 notify=0 owner=syscbsd /usr/local/bin/cbsd qstart inter=0 ${qlist}
+	[ -n "${xlist}" ] && task mode=new autoflush=0 notify=0 owner=syscbsd /usr/local/bin/cbsd xstart inter=0 ${xlist}
 
 	return 0
 }
