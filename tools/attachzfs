@@ -1,6 +1,7 @@
 #!/usr/local/bin/cbsd
 #v11.1.5
 globalconf="${distdir}/cbsd.conf";
+CBSDMODULE="jail"
 MYARG="jname"
 MYOPTARG="fstab zfs"
 MYDESC="Delegate ZFS filesystem to jail"
