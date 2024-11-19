@@ -17,9 +17,10 @@ post_cbsd_cmd_path=
 
 if [ ! -f "${globalconf}" ]; then
 	${ECHO} "${N1_COLOR}no such conf file${N0_COLOR}";
-	exit
+	exit 1
 fi
 
+# help mode
 if [ "$1" = "--help" -o "$1" = "--desc" ]; then
 	# skip for 'cbsd help module=' filter?
 	if [ -n "${CBSDMODULEONLY}" ]; then
@@ -41,7 +42,25 @@ fi
 if [ -n "${1}" -a -f "${1}" ]; then
 	INITCFG="${1}"
 	shift
-	. ${INITCFG}
+
+	if [ ! -r ${INITCFG} ]; then
+		echo "cbsd initenv: preseed config file not readable: ${INITCFG}"
+	fi
+
+	# extra-override params?
+	if [ -n "${1}" ]; then
+		CBSD_INITCFG_EXTRA="/tmp/initenv.extra.$$"
+		truncate -s0 ${CBSD_INITCFG_EXTRA}
+		for i in $*; do
+			if [ "${i}" = "inter=0" ]; then
+				inter=0
+				shift
+				continue
+			fi
+			shift
+			echo "${i}" >> ${CBSD_INITCFG_EXTRA}
+		done
+	fi
 fi
 
 err() {
@@ -990,6 +1009,7 @@ phase5()
 	if [ -n "${INITCFG}" ]; then
 		onodename="${nodename}"
 		. ${INITCFG}
+		[ -n "${CBSD_INITCFG_EXTRA}" ] && . ${CBSD_INITCFG_EXTRA}
 		_uncfg=$( ${GREP_CMD} -v '^#' ${INITCFG} | ${CUT_CMD} -d '=' -f1 | ${XARGS_CMD} )
 		nodename="${onodename}"
 	fi
@@ -1270,10 +1290,15 @@ post_message()
 ############ start locking section #############
 start()
 {
+	if [ -n "${CBSD_INITCFG_EXTRA}" -a -r "${CBSD_INITCFG_EXTRA}" ]; then
+		trap "${RM_CMD} -f ${CBSD_INITCFG_EXTRA}" HUP INT ABRT BUS TERM EXIT
+	fi
+
 	if [ -n "${INITCFG}" ]; then
 		inter=0
 		ALWAYS_YES=1
 		. "${INITCFG}" 2>/dev/null
+		[ -n "${CBSD_INITCFG_EXTRA}" ] && . ${CBSD_INITCFG_EXTRA}
 	fi
 
 	[ -z "${ECHO}" ] && ECHO="echo -e"
@@ -1621,13 +1646,14 @@ export oworkdir="${workdir}"
 
 if [ $# -ne 1 ]; then
 	if [ "${inter}" = "0" ]; then
-		${LOCK_CMD} ${MYLOCK} env INITCFG="${INITCFG}" $0 inter=0 start
+		${LOCK_CMD} ${MYLOCK} env INITCFG="${INITCFG}" CBSD_INITCFG_EXTRA="${CBSD_INITCFG_EXTRA}" $0 inter=0 start
 	else
-		${LOCK_CMD} ${MYLOCK} env INITCFG="${INITCFG}" $0 start
+		${LOCK_CMD} ${MYLOCK} env INITCFG="${INITCFG}" CBSD_INITCFG_EXTRA="${CBSD_INITCFG_EXTRA}" $0 start
 	fi
 fi
 
 [ -n "${INITCFG}" -a -r "${INITCFG}" ] && . ${INITCFG}
+[ -n "${CBSD_INITCFG_EXTRA}" ] && . ${CBSD_INITCFG_EXTRA}
 
 set -e
 . ${distdir}/cbsd.conf
