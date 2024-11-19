@@ -45,7 +45,7 @@ Cross-platform QT6-based GUI client for Mobile phone and Desktop PC:
 [MyBee-QT](https://github.com/myb-project/mybee-qt)
 
 ![MyBee-QT1](https://convectix.com/img/mybee-qt1.png?raw=true)
-![MyBee-QT2](https://convectix.com/img/mybee-qt2.png?raw=true)
+![MyBee-QT2](https://convectix.com/img/mybee-qt4.png?raw=true)
 ![MyBee-QT3](https://convectix.com/img/mybee-qt3.png?raw=true)
 
 ## (alternative) NCURSES-based interface (3rd party)
