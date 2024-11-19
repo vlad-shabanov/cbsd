@@ -34,7 +34,7 @@
 #define BUFLEN 2048
 #define MAXJNAME 128
 #define MAXFNAME 1024
-#define MAXFULLPATH 1024
+#define MAXFULLPATH 2050
 #define MAXDESCRLEN 2048
 
 #define CREATE(result, type, number)                                        \
@@ -176,7 +176,7 @@ main(int argc, char **argv)
 	char def_item[128]; // default item
 	char descrfile[MAXFULLPATH];
 	char fullpath[MAXFULLPATH];
-	char descr[MAXDESCRLEN];
+	char descr[MAXDESCRLEN+16];
 	int listmax = 0;
 	int n = 0;
 	char mylist[100][MAXFNAME];
