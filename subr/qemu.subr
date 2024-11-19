@@ -987,6 +987,10 @@ compile_kernel_args()
 	[ -z "${kernel}" ] && return 0
 	[ "${kernel}" = "0" ] && return 0
 
+	if [ ! -r "${kernel}" ]; then
+		err 1 "Unable to find the boot kernel (e.g. u-boot-qemu-XXXX package: u-boot-qemu-riscv64/u-boot-qemu-arm64/..): ${kernel}"
+	fi
+
 	kernel_args="-kernel ${kernel}"
 	return 0
 }
@@ -997,6 +1001,10 @@ compile_bios_args()
 
 	[ -z "${bios}" ] && return 0
 	[ "${bios}" = "0" ] && return 0
+
+	if [ ! -r "${bios}" ]; then
+		err 1 "Unable to find the BIOS (e.g. opensbi package): ${bios}"
+	fi
 
 	bios_args="-bios ${bios}"
 	return 0

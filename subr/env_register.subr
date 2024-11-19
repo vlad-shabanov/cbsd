@@ -96,6 +96,7 @@ register_insert_bhyve()
 	_sqlvalue="'${jname}'"
 
 	[ -n "${register_iso_as}" -a -z "${vm_iso_path}" ] && vm_iso_path="${register_iso_as}"
+	[ -n "${vm_arch}" ] && arch="${vm_arch}"
 
 	# back compatible - old schema
 	for _i in ${MYCOL}; do
@@ -198,6 +199,8 @@ register_insert_virtualbox()
 	_sqlparam="jname "
 	_sqlvalue="'${jname}'"
 
+	[ -n "${vm_arch}" ] && arch="${vm_arch}"
+
 	for _i in $MYCOL; do
 		eval _val=\$${_i}
 		# [ -z "${_val}" ] && _val="0"
@@ -264,6 +267,7 @@ register_insert_xen()
 	_sqlvalue="'${jname}'"
 
 	[ -n "${register_iso_as}" -a -z "${vm_iso_path}" ] && vm_iso_path="${register_iso_as}"
+	[ -n "${vm_arch}" ] && arch="${vm_arch}"
 
 	# back compatible - old schema
 	for _i in ${MYCOL}; do
@@ -360,6 +364,7 @@ register_insert_qemu()
 	_sqlvalue="'${jname}'"
 
 	[ -n "${register_iso_as}" -a -z "${vm_iso_path}" ] && vm_iso_path="${register_iso_as}"
+	[ -n "${vm_arch}" ] && arch="${vm_arch}"
 
 	# back compatible - old schema
 	for _i in ${MYCOL}; do
