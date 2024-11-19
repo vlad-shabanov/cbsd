@@ -34,7 +34,6 @@ if [ -z "${tac}" ]; then
 	tac="tail -r"
 fi
 
-
 BSDCFG_SHARE="/usr/local/cbsd/share/bsdconfig"
 [ "$_COMMON_SUBR" ] || . $BSDCFG_SHARE/common.subr || exit 1
 
@@ -596,9 +595,18 @@ f_sysrc_set()
 #		return $FAILURE
 #	fi
 
-	local tmpfile="$( mktemp )"
-	[ "$tmpfile" ] || return $FAILURE
+	if [ -n "${workdir}" ]; then
+		ftmpdir="${workdir}/tmp"
+	elif [ -n "${cbsd_workdir}" ]; then
+		ftmpdir="${cbsd_workdir}/tmp"
+	elif [ -n "${TMPDIR}" ]; then
+		ftmpdir="${TMPDIR}"
+	else
+		ftmpdir="/tmp"
+	fi
 
+	local tmpfile="$( ${MKTEMP_CMD} -p ${ftmpdir} )"
+	[ "${tmpfile}" ] || return $FAILURE
 
 	#
 	# Fixup permissions (else we're in for a surprise, as mktemp(1) creates
@@ -613,22 +621,22 @@ f_sysrc_set()
 #		mode=0644
 #	f_eval_catch -d $funcname chmod 'chmod "%s" "%s"' "$mode" "$tmpfile"
 
-	case $( uname -s ) in
+	case $( ${UNAME_CMD} -s ) in
 		Linux)
-			mode=$( stat -c "%a" ${file} 2>/dev/null )
-			owner=$( stat -c "%u:%g" ${file} 2>/dev/null )
+			mode=$( ${STAT_CMD} -c "%a" ${file} 2>/dev/null )
+			owner=$( ${STAT_CMD} -c "%u:%g" ${file} 2>/dev/null )
 			;;
 		*)
-			mode=$( stat -f "%Lp" ${file} 2>/dev/null )
-			owner=$( stat -f "%u:%g" ${file} 2>/dev/null )
+			mode=$( ${STAT_CMD} -f "%Lp" ${file} 2>/dev/null )
+			owner=$( ${STAT_CMD} -f "%u:%g" ${file} 2>/dev/null )
 			;;
 	esac
 
 	[ -z "${mode}" ] && mode="0644"
 	[ -z "${owner}" ] && mode="0:0"
 
-	chmod ${mode} ${tmpfile}
-	chown ${owner} ${tmpfile}
+	${CHMOD_CMD} ${mode} ${tmpfile}
+	${CHOWN_CMD} ${owner} ${tmpfile}
 
 	#
 	# Fixup ownership. The destination file _is_ writable (we tested

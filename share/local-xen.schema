@@ -10,6 +10,8 @@ jname="text default 0 unique"
 vm_cpus="integer default 1"
 vm_ram="integer default 536870912"
 
+arch="text default '0'"
+
 #vm_os_type="text default freebsd"
 #vm_boot="text default hdd"
 #virtio_type="text default \"ahci-hd\""
