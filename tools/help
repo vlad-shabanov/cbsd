@@ -38,7 +38,7 @@ if [ "${1}" = "--help" ]; then
 	${ECHO} "${BOLD}require: ${GREENL}${MYARG}${N0_COLOR}"
 	${ECHO} "${BOLD}opt: ${N2_COLOR}${MYOPTARG}${N0_COLOR}"
 	[ -n "${ADDHELP}" ] && printf "${N2_COLOR}${ADDHELP}${N0_COLOR}"
-	printf "${BOLD}External help: ${N2_COLOR}https://www.bsdstore.ru${N0_COLOR}\n"
+	printf "${BOLD}External help: ${N2_COLOR}https://github.com/cbsd/cbsd/blob/master/share/docs${N0_COLOR}\n"
 	exit 0
 fi
 
@@ -115,7 +115,7 @@ show_help()
 
 ### MAIN
 ${ECHO} "${BOLD}CBSD version:                  ${H3_COLOR}${myversion}${N0_COLOR}" 1>&2
-${ECHO} "${BOLD}CBSD documentation:            ${H3_COLOR}https://bsdstore.ru/en/docs.html${N0_COLOR}" 1>&2
+${ECHO} "${BOLD}CBSD documentation:            ${H3_COLOR}https://github.com/cbsd/cbsd/blob/master/share/docs${N0_COLOR}" 1>&2
 ${ECHO} "${BOLD}CBSD Telegram user group chat: ${H3_COLOR}https://t.me/cbsdofficial${N0_COLOR}" 1>&2
 echo 1>&2
 ${ECHO} "${BOLD}${UNDERLINE}Available commands:${N0_COLOR}" 1>&2
