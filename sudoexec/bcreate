@@ -140,6 +140,8 @@ extra_profile_dir=
 
 flavor=
 oflavor=
+quiet=0
+oquiet=0
 
 . ${subrdir}/universe.subr
 . ${subrdir}/freebsd_world.subr
@@ -323,7 +325,6 @@ fi
 
 # if some of params specified via args, restore them from temporary vars
 for i in ${BHYVE_ARGS}; do
-
 	eval _mytest=\$o$i
 	# Adjust some missed optional args
 	if [ -z "${_mytest}" ]; then
@@ -394,7 +395,7 @@ if [ "${mnt_start}" != "0" ]; then
 	if [ ! -r "${mnt_start}" -o ! -x "${mnt_start}" ]; then
 		err 1 "mnt_start script not exist or not executable: ${mnt_start}"
 	fi
-	${ECHO} "${N1_COLOR}Execute mnt_start script: ${N2_COLOR}${mnt_start}${N0_COLOR}..."
+	[ ${quiet} -ne 1 ] && ${ECHO} "${N1_COLOR}Execute mnt_start script: ${N2_COLOR}${mnt_start}${N0_COLOR}..."
 	# external mount, reset zfsfeat
 	zfsfeat=0
 	[ ! -d "${data}" ] && ${MKDIR_CMD} -m 0770 ${data}
@@ -885,7 +886,7 @@ for i in ${system_dir}; do
 		[ ! -d ${jailsysdir}/${jname}/${i} ] && ${MKDIR_CMD} -m 0775 -p ${jailsysdir}/${jname}/${i}
 		${RSYNC_CMD} -az ${systemskeldir}/${i}/ ${jailsysdir}/${jname}/${i}/
 	else
-		${ECHO} "${N1_COLOR}bcreate: warning: no such dir: ${N2_COLOR}${systemskeldir}/${i}${N0_COLOR}"
+		[ ${quiet} -ne 1 ] && ${ECHO} "${N1_COLOR}qcreate: warning: no such dir: ${N2_COLOR}${systemskeldir}/${i}${N0_COLOR}"
 		continue
 	fi
 	${CHOWN_CMD} -R ${cbsduser}:${cbsduser} ${jailsysdir}/${jname}/${i}
