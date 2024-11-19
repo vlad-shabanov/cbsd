@@ -35,21 +35,28 @@ err() {
 	exit ${exitval}
 }
 
-WHICH_CMD=$( which which 2>/dev/null )
+# notes: CBSD_CMD macros may be missing, we must support this script to run without 
+# an initialized CBSD working directory
+[ -z "${WHICH_CMD}" ] && WHICH_CMD=$( which which 2>/dev/null )
 [ -z "${WHICH_CMD}" ] && err 1 "initenv error: no such executable dependency/requirement: which"
 
-TR_CMD=$( ${WHICH_CMD} tr 2>/dev/null )
+[ -z "${TR_CMD}" ] && TR_CMD=$( ${WHICH_CMD} tr 2>/dev/null )
 [ -z "${TR_CMD}" ] && err 1 "initenv error: no such executable dependency/requirement: tr"
 
-UNAME_CMD=$( ${WHICH_CMD} uname 2>/dev/null )
+[ -z "${UNAME_CMD}" ] && UNAME_CMD=$( ${WHICH_CMD} uname 2>/dev/null )
 [ -z "${UNAME_CMD}" ] && err 1 "initenv error: no such executable dependency/requirement: uname"
 
 MAIN_CMD="
 awk
 cat
+chmod
+chown
 grep
 hostname
 mount
+mktemp
+stat
+uname
 "
 
 for i in ${MAIN_CMD} ${MAIN_EXTRA_CMD}; do
@@ -60,7 +67,6 @@ for i in ${MAIN_CMD} ${MAIN_EXTRA_CMD}; do
 	MY_CMD="${MY_CMD}_CMD"
 	eval "${MY_CMD}=\"${mycmd}\""
 done
-
 
 # Prevent `-d' from being interpreted as a debug flag by common.subr
 DEBUG_SELF_INITIALIZE=
