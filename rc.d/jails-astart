@@ -31,7 +31,7 @@ jails_stop()
 				env TERM=xterm /usr/local/cbsd/misc/daemonize -E TERM=xterm -p ${stoppid} /usr/local/cbsd/bhyvectl/bstop jname=${jname}
 				;;
 			jail)
-				env TERM=xterm /usr/local/cbsd/misc/daemonize -E TERM=xterm -p ${stoppid} /usr/local/cbsd/jailctl/jstop name=${jname}
+				env TERM=xterm /usr/local/cbsd/misc/daemonize -E TERM=xterm -p ${stoppid} /usr/local/cbsd/jailctl/jstop jname=${jname}
 				;;
 			xen)
 				env TERM=xterm /usr/local/cbsd/misc/daemonize -E TERM=xterm -p ${stoppid} /usr/local/cbsd/bhyvectl/xstop jname=${jname}
