@@ -6,9 +6,7 @@ MYOPTARG="cbsdkeyfile pw"
 MYDESC="Get rsa get from remote node"
 
 . ${subrdir}/nc.subr
-
 . ${cbsdinit}
-
 . ${nodes}
 
 [ -z "${cbsdkeyfile}" -a -z "${pw}" ] && err 1 "${N1_COLOR}nodeaddkey: ${N2_COLOR}pw=${N1_COLOR} or ${N2_COLOR}cbsdkeyfile=${N1_COLOR} is mandatory${N0_COLOR}"
@@ -44,22 +42,31 @@ case ${_ret} in
 	;;
 esac
 
+cbsdlogger NOTICE ${CBSD_APP}: ${CBSD_SFTP_CMD}
 ${CBSD_SFTP_CMD}
-RESULT=$?
+_res=$?
 
-case ${RESULT} in
+[ ! -r "${LOCALKEY}" ] && _res=3
+
+case ${_res} in
 	0)
+		# 0440 also not suitable (for 'cbsd' group, e.g. for 3rd party app)!
 		${CHMOD_CMD} 0400 ${LOCALKEY}
 		${CHOWN_CMD} ${cbsduser}:${cbsduser} ${LOCALKEY}
-		err 0 "${N1_COLOR}Key has been added succesful:${N2_COLOR} ${LOCALKEY}${N0_COLOR}"
+		log_err 0 "${N1_COLOR}Key has been added succesful for ${ip}: ${N2_COLOR}${LOCALKEY}${N0_COLOR}"
 		;;
 	1)
-		err 1 "${N1_COLOR}Bad user or password.${N0_COLOR}"
+		log_err 1 "${N1_COLOR}Bad user or password.${N0_COLOR}"
 		;;
 	2)
-		err 2 "${N1_COLOR}No such key on remote host:${N2_COLOR} ${REMOTEKEY}${N0_COLOR}"
+		log_err 2 "${N1_COLOR}No such key on remote host:${N2_COLOR} ${REMOTEKEY}${N0_COLOR}"
+		;;
+	3)
+		log_err 2 "${N1_COLOR}sftp passed but key not saved: ${N2_COLOR}${REMOTEKEY}${N0_COLOR}"
 		;;
 	*)
-		err 3 "${N1_COLOR}Unknown error.${N0_COLOR}"
+		log_err 3 "${N1_COLOR}Unknown error.${N0_COLOR}"
 		;;
 esac
+
+exit 0

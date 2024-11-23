@@ -2,19 +2,55 @@
 #v12.0.9
 CBSDMODULE="node"
 MYARG="mode"
-MYOPTARG="node port rootkeyfile cbsdkeyfile pw header allinfo display ip"
+MYOPTARG="allinfo cbsdkeyfile display header ip node port pw rootkeyfile"
 MYDESC="Manipulate or show information for remote nodes"
-ADDHELP="mode = add, remove, list, status\n\
-node = remote node ip or fqdn\n\
-port = ssh port of remote node\n\
-ip = IP address for update\n\
-rootkeyfile = path to id_rsa for root access\n\
-pw = password of cbsd user from remote node (when cbsdkeyfile= is not used)\n\
-cbsdkeyfile = path to cbsd user id_rsa insead of pw\n\
-header = print header in node list\n\
-allinfo = 1 (default) show all info for nodelist, 0 - only nodename\n\
-display= list by comma for column. Default: nodename,ip,port,keyfile,status,idle\n\
-mode=show,update - show or modify details about node\n"
+ADDHELP="
+${H3_COLOR}Description${N0_COLOR}:
+
+This script forces two CBSD nodes to exchange private keys and thus provide each other 
+with password-less access from the 'cbsd' user (who, in fact, has root privileges!) 
+through the OpenSSH service.
+
+This is one of the mechanisms to build a cluster (a group of interconnected computers 
+performing a common function), as opposed to the API-based method.
+
+Connectivity via SSH (peer-to-peer network) and interaction via API 
+(single point of failure/controller one-to-many) are opposite solutions in architecture. 
+
+Each method has its own pros and cons. By default, script use ssh public/private key 
+from the ~cbsd/.ssh directory.
+
+Before adding remote nodes, make sure you copy the public key as 'authorized_keys' on
+remote host:
+
+  cp -a ~cbsd/.ssh/id_rsa.pub ~cbsd/.ssh/authorized_keys
+
+Also, the private key of the remote node will be saved in the ~cbsd/.rssh directory.
+
+${H3_COLOR}Options${N0_COLOR}:
+
+ ${N2_COLOR}allinfo=${N0_COLOR}      - 1 (default) show all info for nodelist, 0 - only nodename
+ ${N2_COLOR}cbsdkeyfile=${N0_COLOR}  - alternative path private key.
+ ${N2_COLOR}display=${N0_COLOR}      - list by comma for column. 
+                 default: nodename,ip,port,keyfile,status,idle
+ ${N2_COLOR}header=${N0_COLOR}       - print header in node list
+ ${N2_COLOR}ip=${N0_COLOR}           - IP address for update
+ ${N2_COLOR}mode=${N0_COLOR}         - add,remove,list,show,update,status - show or modify details about node
+ ${N2_COLOR}node=${N0_COLOR}         - remote node ip or fqdn
+ ${N2_COLOR}port=${N0_COLOR}         - 22 (default), alternative ssh port of remote node
+ ${N2_COLOR}pw=${N0_COLOR}           - password of cbsd user from remote node (when cbsdkeyfile= is not used)
+ ${N2_COLOR}rootkeyfile=${N0_COLOR}  - path to id_rsa for root access
+
+${H3_COLOR}Examples${N0_COLOR}:
+
+ # cbsd node mode=add node=10.0.0.7
+
+${H3_COLOR}See also${N0_COLOR}:
+
+ cbsd rexe --help
+
+"
+
 EXTHELP="wf_node"
 
 . ${subrdir}/nc.subr
@@ -50,24 +86,24 @@ getpw()
 	local oldmodes=$( ${STTY_CMD} -g )
 	pw=""
 
-	trap "stty ${oldmodes}" HUP INT ABRT BUS TERM EXIT
+	trap "${STTY_CMD} ${oldmodes}" HUP INT ABRT BUS TERM EXIT
 
 	printf "${BOLD}Enter password of cbsd user on ${N2_COLOR}${node}${N0_COLOR}${BOLD}:${N0_COLOR} "
 	while [ -z "${pw}" ]; do
-		stty -echo
+		${STTY_CMD} -echo
 		set -e
 		read pw
 		set +e
 	done
 
-	stty ${oldmodes}
+	${STTY_CMD} ${oldmodes}
 	echo
 }
 
 nodeadd()
 {
-	local _res
-	local _myip
+	local _res= _ret=
+	local _myip=
 
 	[ -z "${node}" ] && err 1 "${N1_COLOR}Empty node${N0_COLOR}"
 	[ -z "${port}" ] && port=22
@@ -125,17 +161,19 @@ nodeadd()
 
 	${ECHO} "${N1_COLOR}Connecting to ${node} via ${proto}...${N0_COLOR}"
 	NODENAME=$( ${CBSD_SSH_CMD} /usr/local/bin/cbsd getinfo -q nodename )
-	code=$?
+	_ret=$?
 
-	case ${code} in
+	cbsdlogger NOTICE ${CBSD_APP}: remote node getinfo: ${CBSD_SSH_CMD}
+
+	case ${_ret} in
 		0)
 			${ECHO} "${N1_COLOR}${node} has nodename: ${N2_COLOR}${NODENAME}${N0_COLOR}"
 			;;
 		2)
-			err 1 "${N1_COLOR}Bad password or system user: ${NODENAME}${N0_COLOR}"
+			log_err 1 "${N1_COLOR}Bad password or system user: ${NODENAME}${N0_COLOR}"
 			;;
 		*)
-			err 1 "${N1_COLOR}Connection problem (code ${code}): ${N2_COLOR}${NODENAME}${N0_COLOR}"
+			log_err 1 "${N1_COLOR}Connection problem (_ret ${_ret}): ${N2_COLOR}${NODENAME}${N0_COLOR}"
 			;;
 	esac
 
@@ -151,43 +189,64 @@ nodeadd()
 
 	case ${_res} in
 		0)
-			${ECHO} "${N1_COLOR}Added successful: ${N2_COLOR}${node}${N0_COLOR}"
-			${ECHO} "${W1_COLOR}!Warning! ${H5_COLOR}In a multi-node configuration your commands can be run on remote servers ${W1_COLOR}!Warning!${N0_COLOR}"
-			${ECHO} "${W1_COLOR}!Warning! ${H5_COLOR}Be careful with [xjb]remove-like command ${W1_COLOR}!Warning!${N0_COLOR}"
-			LOCALKEY="${rsshdir}/${MD5NAME}.id_rsa"
-			${TOUCH_CMD} ${rsshdir}/${NODENAME}.node
-			/usr/local/cbsd/misc/cbsdsysrc -qf ${rsshdir}/${NODENAME}.node SSHKEY=${LOCALKEY} > /dev/null
-			/usr/local/cbsd/misc/cbsdsysrc -qf ${rsshdir}/${NODENAME}.node IP=${node} > /dev/null
-			/usr/local/cbsd/misc/cbsdsysrc -qf ${rsshdir}/${NODENAME}.node PORT=${port} > /dev/null
-			${CHOWN_CMD} ${cbsduser} ${rsshdir}/${NODENAME}.node
-			IP=$( cbsdsqlro nodes SELECT ip FROM nodelist WHERE nodename=\"${NODENAME}\" )
-
-			external_exec_master_node_script -a add.d -n ${NODENAME} -i ${node} -p ${port} -k ${LOCALKEY}
-
-			if [ -z "${IP}" ]; then
-				cbsdsqlrw nodes "INSERT INTO nodelist ( nodename, ip, port, keyfile, rootkeyfile, invfile ) VALUES ( \"${NODENAME}\", \"${node}\", \"${port}\", \"${LOCALKEY}\", \"${rootkeyfile}\", \"inv.${NODENAME}.sqlite\" )"
-			else
-				${ECHO} "${N1_COLOR}Already exist in database, updating: ${N2_COLOR}${node}${N0_COLOR}"
-				cbsdsqlrw nodes DELETE FROM nodelist WHERE nodename=\"${NODENAME}\"
-				cbsdsqlrw nodes "INSERT INTO nodelist ( nodename, ip, port, keyfile, rootkeyfile, invfile ) VALUES ( \"${NODENAME}\", \"${node}\", \"${port}\", \"${LOCALKEY}\", \"${rootkeyfile}\", \"inv.${NODENAME}.sqlite\" )"
-			fi
-			idle_update ${NODENAME}
-			retrinv node=${NODENAME} tryoffline=1
-			return ${_res}
+			true
 			;;
 		1)
-			cat ${DEBLOG}
+			if [ -r ${DEBLOG} ]; then
+				${CAT_CMD} ${DEBLOG}
+				${RM_CMD} ${DEBLOG}
+			fi
 			err ${_res} "${N1_COLOR}Error: Bad password${N0_COLOR}"
 			;;
 		2)
-			[ -f "${DEBLOG}" ] && ${CAT_CMD} ${DEBLOG}
+			if [ -r ${DEBLOG} ]; then
+				${CAT_CMD} ${DEBLOG}
+				${RM_CMD} ${DEBLOG}
+			fi
 			err ${_res} "${N1_COLOR}Error: No key found or wrong hostname. Please run: 'cbsd initenv' on remote machine${N0_COLOR}"
 			;;
 		*)
-			cat ${DEBLOG}
+			if [ -r ${DEBLOG} ]; then
+				${CAT_CMD} ${DEBLOG}
+				${RM_CMD} ${DEBLOG}
+			fi
 			err ${_res} "${N1_COLOR}Error: Unkown error${N0_COLOR}"
 			;;
 	esac
+
+	[ -r ${DEBLOG} ] && ${RM_CMD} ${DEBLOG}
+
+	# Copy remote .pub into authorized_keys
+	printf "${N1_COLOR}Update ~cbsd/.ssh/authorized_keys...${N0_COLOR}"
+	${CBSD_SSH_CMD} ${CP_CMD} -a .ssh/id_rsa.pub .ssh/authorized_keys >/dev/null 2>&1
+	_ret=$?
+
+	if [ ${_ret} -ne 0 ]; then
+		err 1 "failed: ${CP_CMD} -a .ssh/id_rsa.pub authorized_keys"
+	fi
+
+	${CAT_CMD} ${DEBLOG}
+	${ECHO} "${W1_COLOR}>>>   !Warning! Please note! !Warning!${N0_COLOR}"
+	${ECHO} "${H5_COLOR}Having a ~cbsd/.ssh/authorized_keys file on ${NODENAME}, anyone who gets private key (~cbsd/.ssh/id_rsa) will have the access from cbsd user!${N0_COLOR}"
+	${ECHO} "${H5_COLOR}In a multi-node configuration your commands can be run on remote servers.${N0_COLOR}"
+	${ECHO} "${H5_COLOR}Be careful with [xjb]remove-like command.${N0_COLOR}"
+	${ECHO} "${W1_COLOR}<<<   !Warning! Please note! !Warning!${N0_COLOR}"
+	LOCALKEY="${rsshdir}/${MD5NAME}.id_rsa"
+	${TOUCH_CMD} ${rsshdir}/${NODENAME}.node
+	/usr/local/cbsd/misc/cbsdsysrc -qf ${rsshdir}/${NODENAME}.node SSHKEY=${LOCALKEY} IP=${node} PORT=${port} > /dev/null
+	${CHOWN_CMD} ${cbsduser} ${rsshdir}/${NODENAME}.node
+	IP=$( cbsdsqlro nodes "SELECT ip FROM nodelist WHERE nodename='${NODENAME}'" )
+	external_exec_master_node_script -a add.d -n ${NODENAME} -i ${node} -p ${port} -k ${LOCALKEY}
+	if [ -z "${IP}" ]; then
+		cbsdsqlrw nodes "INSERT INTO nodelist ( nodename, ip, port, keyfile, rootkeyfile, invfile ) VALUES ( '${NODENAME}', '${node}', '${port}', '${LOCALKEY}', '${rootkeyfile}', 'inv.${NODENAME}.sqlite' )"
+	else
+		${ECHO} "${N1_COLOR}Already exist in database, updating: ${N2_COLOR}${node}${N0_COLOR}"
+		cbsdsqlrw nodes "DELETE FROM nodelist WHERE nodename='${NODENAME}'"
+		cbsdsqlrw nodes "INSERT INTO nodelist ( nodename, ip, port, keyfile, rootkeyfile, invfile ) VALUES ( '${NODENAME}', '${node}', '${port}', '${LOCALKEY}', '${rootkeyfile}', 'inv.${NODENAME}.sqlite' )"
+	fi
+	idle_update ${NODENAME}
+	retrinv node=${NODENAME} tryoffline=1
+	return ${_res}
 }
 
 nodedel()
@@ -262,7 +321,7 @@ shownode() {
 	local _res
 
 	local sqldelimer=" "
-	_res=$( cbsdsqlro nodes SELECT nodename FROM nodelist WHERE nodename=\"${node}\" )
+	_res=$( cbsdsqlro nodes "SELECT nodename FROM nodelist WHERE nodename='${node}'" )
 
 	[ -z "${_res}" ] && err 1 "${N1_COLOR}No such node in databases: ${N2_COLOR}${node}${N0_COLOR}"
 
@@ -297,8 +356,8 @@ shownode() {
 
 	sqldelimer=" "
 
-	local jailsnum=$( cbsdsqlro ${node} SELECT count\(jname\) FROM jails WHERE emulator != \"bhyve\" )
-	local vmsnum=$( cbsdsqlro ${node} SELECT count\(jname\) FROM jails WHERE emulator = \"bhyve\" )
+	local jailsnum=$( cbsdsqlro ${node} "SELECT count\(jname\) FROM jails WHERE emulator != 'bhyve'" )
+	local vmsnum=$( cbsdsqlro ${node} "SELECT count\(jname\) FROM jails WHERE emulator = 'bhyve'" )
 
 	[ -z "${jailsnum}" ] && jailsnum="0"
 	[ -z "${vmsnum}" ] && vmsnum="0"

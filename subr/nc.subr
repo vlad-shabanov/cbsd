@@ -568,7 +568,7 @@ dot()
 		${ECHO} "${N1_COLOR}Error in $1${N0_COLOR}"
 		if [ -f ${DEBLOG} ]; then
 			${ECHO} "${N1_COLOR}Guru meditaion: ${N0_COLOR}"
-			cat ${DEBLOG}
+			${CAT_CMD} ${DEBLOG}
 		fi
 
 		exit 1

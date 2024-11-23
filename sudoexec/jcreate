@@ -527,7 +527,9 @@ get_base -v ${ver} ${_basename_args}
 
 [ -d "${data}" ] && remove_data_dir ${data}
 [ ! -d ${path} -a "${baserw}" -eq 0 ] && ${MKDIR_CMD} -m 0755 -p ${path}
-[ ! -d ${jailsysdir}/${jname} ] && ${MKDIR_CMD} -p ${jailsysdir}/${jname}
+[ ! -d ${jailsysdir}/${jname}/traffic ] && ${MKDIR_CMD} -p ${jailsysdir}/${jname}/traffic
+${TOUCH_CMD} ${jailsysdir}/${jname}/descr
+
 [ -z "${mnt_start}" ] && mnt_start="0"
 
 if [ "${mnt_start}" != "0" ]; then

@@ -1120,8 +1120,9 @@ install_sshkey()
 		[ -n "${_install_pub}" ] && ${CP_CMD} -a ${_install_pub} ${_pubfile} && ${ECHO} "${N1_COLOR}Public key updated${N0_COLOR}"
 	fi
 
-	${CHMOD_CMD} 0444 ${_pubfile}
-	${CHMOD_CMD} 0440 ${_keyfile}
+	${CHMOD_CMD} 0644 ${_pubfile}
+	# 0440 also not suitable (for 'cbsd' group, e.g. for 3rd party app)!
+	${CHMOD_CMD} 0400 ${_keyfile}
 	${CHOWN_CMD} ${cbsduser}:${cbsduser} ${_keyfile} ${_pubfile}
 	${LN_CMD} -sf ${_keyfile} ${sshdir}/id_rsa
 	${LN_CMD} -sf ${_pubfile} ${sshdir}/id_rsa.pub

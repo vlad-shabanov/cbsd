@@ -38,14 +38,13 @@ shmux()
 
 	if [ -f "${_locallockfile}" ]; then
 		if check_locktime ${_locallockfile} >/dev/null 2>&1; then
-			cbsdsqlrw nodes "UPDATE nodelist SET idle=datetime('now','localtime') WHERE ip=\"${_ip}\""
+			cbsdsqlrw nodes "UPDATE nodelist SET idle=datetime('now','localtime') WHERE ip='${_ip}'"
 		fi
 		return 0
 	fi
 
 	SSH_ARGS="-oControlPersist=30m -oBatchMode=yes -oStrictHostKeyChecking=no -oConnectTimeout=5 -q -oPort=${_port} -i ${_keyfile} -l ${cbsduser} ${_ip}"
-
-	[ ! -f "${_locallockfile}" ] && env workdir="${workdir}" ${miscdir}/daemon -u ${cbsduser} ${_locallock} ${SSH_CMD} ${SSH_ARGS} "${_remotelock} /usr/local/cbsd/misc/cbsd_dot --file=var/db/local.sqlite" > ${tmpdir}/inv.${_ip}.updated 2>/dev/null
+	[ ! -f "${_locallockfile}" ] && env workdir="${workdir}" ${miscdir}/daemon -u ${cbsduser} ${_locallock} ${SSH_CMD} ${SSH_ARGS} "${_remotelock} /usr/local/cbsd/misc/cbsd_dot --file=var/db/local.sqlite" > ${tmpdir}/inv.${_ip}.updated 2>${tmpdir}/inv.${_ip}.updated.err
 }
 
 update_jaillock()
