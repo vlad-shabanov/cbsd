@@ -535,7 +535,7 @@ if [ "${vnet}" = "1" ]; then
 	# for vnet we can make another action
 	. ${subrdir}/vnet.subr
 
-	interfaces=$( cbsdsqlro ${jailsysdir}/${jname}/local.sqlite SELECT name FROM jailnic | while read _int; do
+	interfaces=$( cbsdsqlro ${jailsysdir}/${jname}/local.sqlite "SELECT name FROM jailnic" | while read _int; do
 		printf "${_int} "
 	done ) || err 1 "${N1_COLOR}jstart: error get interfaces name for vnet nic map${N0_COLOR}"
 
@@ -544,13 +544,38 @@ if [ "${vnet}" = "1" ]; then
 
 	for i in ${interfaces}; do
 
+		tmp_type=${i%%#*}		# cut all after '#'
+		tmp_iface=${i##*#}		# cut all before '#'
+
+		case "${tmp_type}" in
+			ppt|epair|ovs)
+				nic_type="${tmp_type}"
+				i="${tmp_iface}"
+				;;
+			*)
+				nic_type="epair"		# epair by default
+				true
+				;;
+		esac
+
+		case "${tmp_iface}" in
+			epair*)
+				nic_type="epair"
+				;;
+			*)
+				nic_type="ppt"
+				;;
+		esac
+
+		unset tmp_type tmp_type
+
 		nic_hwaddr=
 		nic_parent=
 		nic_address=
 		_A=
-		_A=$( cbsdsqlro ${jailsysdir}/${jname}/local.sqlite SELECT nic_parent,nic_address,nic_hwaddr FROM jailnic WHERE name=\"${i}\" )
+		_A=$( cbsdsqlro ${jailsysdir}/${jname}/local.sqlite "SELECT nic_parent,nic_address,nic_hwaddr FROM jailnic WHERE name='${i}'" )
 		sqllist "${_A}" nic_parent nic_address nic_hwaddr
-		#nic_parent=$( cbsdsqlro ${jailsysdir}/${jname}/local.sqlite SELECT nic_parent FROM jailnic WHERE name=\"${i}\" )
+		#nic_parent=$( cbsdsqlro ${jailsysdir}/${jname}/local.sqlite "SELECT nic_parent FROM jailnic WHERE name='${i}'" )
 
 		# when ip=0 and interface=auto we must use default interface for upstream
 		[ "${nic_parent}" = "0" -o "${nic_parent}" = "auto" ] && nic_parent=$( getnics-by-ip ip=0.0.0.0 skip=bridge )
@@ -586,14 +611,23 @@ if [ "${vnet}" = "1" ]; then
 				fi
 		esac
 
-		myepair=$( get_my_epair ${mybridge} )
-		[ $? -eq 1 ] && err 1 "${N1_COLOR}Error: Cant get_my_epair by: ${N2_COLOR}${mybridge}${N0_COLOR}"
-		if [ -z "${epairb_list}" ]; then
-			epaira_list="${myepair}a"
-			epairb_list="${myepair}b"
+		if [ "${nic_type}" = "ppt" ]; then
+			myepair="${i}"
+			if [ -z "${epairb_list}" ]; then
+				epairb_list="${myepair}"
+			else
+				epairb_list="${epairb_list},${myepair}b"
+			fi
 		else
-			epaira_list="${epaira_list},${myepair}a"
-			epairb_list="${epairb_list},${myepair}b"
+			myepair=$( get_my_epair ${mybridge} )
+			[ $? -eq 1 ] && err 1 "${N1_COLOR}Error: Cant get_my_epair by: ${N2_COLOR}${mybridge}${N0_COLOR}"
+			if [ -z "${epairb_list}" ]; then
+				epaira_list="${myepair}a"
+				epairb_list="${myepair}b"
+			else
+				epaira_list="${epaira_list},${myepair}a"
+				epairb_list="${epairb_list},${myepair}b"
+			fi
 		fi
 
 		case "${nic_parent}" in
@@ -609,7 +643,7 @@ if [ "${vnet}" = "1" ]; then
 					_vale_arg=$( substr --pos=0 --len=${_pos} --str="${nic_parent}" )
 					_sw=$( substr --pos=$(( ${_pos} +2 )) --len=${_pref} --str="${nic_parent}" )
 				fi
-				valeid=$( cbsdsqlro local SELECT idx FROM vale WHERE name=\"${_sw}\"  )
+				valeid=$( cbsdsqlro local "SELECT idx FROM vale WHERE name='${_sw}'"  )
 				[ -z "${valeid}" ] && log_err 1 "${N1_COLOR}${CBSD_APP}: can't determine vale nic for: ${nic_parent}, sw: ${_sw}${N0_COLOR}"
 				#mytap="vale${valeid}:${jname}"
 				cbsdlogger NOTICE "${CBSD_APP}: vale switch id: ${valeid} (vale${valeid})"
@@ -618,24 +652,49 @@ if [ "${vnet}" = "1" ]; then
 		esac
 
 		printf "${H3_COLOR}${myepair}:${N2_COLOR}${nic_parent} "
-		${IFCONFIG_CMD} ${myepair}a description ${jname}-eth${eth_seq} up
-		eth_seq=$(( eth_seq + 1 ))
-		TRAP="${TRAP} ${IFCONFIG_CMD} ${myepair}a destroy;"
-		trap "${TRAP}" HUP INT ABRT BUS TERM EXIT
 
-		#nic_hwaddr=$( cbsdsqlro ${jailsysdir}/${jname}/local.sqlite SELECT nic_hwaddr FROM jailnic WHERE name=\"${i}\" )
+		case "${nic_type}" in
+			ppt)
+				#${IFCONFIG_CMD} ${myepair} description ${jname}-eth${eth_seq} up
+				${IFCONFIG_CMD} ${myepair} description ${jname}-${myepair} up
+				;;
+			*)
+				${IFCONFIG_CMD} ${myepair}a description ${jname}-eth${eth_seq} up
+				;;
+		esac
+
+		eth_seq=$(( eth_seq + 1 ))
+
+		case "${nic_type}" in
+			ppt)
+				true
+#				TRAP="${TRAP} ${IFCONFIG_CMD} eth${eth_seq} name ${myepair};"
+#				trap "${TRAP}" HUP INT ABRT BUS TERM EXIT
+				;;
+			*)
+				TRAP="${TRAP} ${IFCONFIG_CMD} ${myepair}a destroy;"
+				trap "${TRAP}" HUP INT ABRT BUS TERM EXIT
+				;;
+		esac
 
 		# MAC MGMT
 		if [ "${nic_hwaddr}" = "0" ]; then
 			nic_hwaddr=$( mac_gen 00:a0:98 )
-			cbsdsqlrw ${jailsysdir}/${jname}/local.sqlite "UPDATE jailnic SET nic_hwaddr=\"${nic_hwaddr}\" WHERE name=\"${i}\""
+			cbsdsqlrw ${jailsysdir}/${jname}/local.sqlite "UPDATE jailnic SET nic_hwaddr='${nic_hwaddr}' WHERE name='${i}'"
 		fi
 
-		cbsdlogger NOTICE ${CBSD_APP}: jail ${jname}: set hwaddr for vnet interface ${myepair}b: ${nic_hwaddr}
-		${IFCONFIG_CMD} ${myepair}b ether ${nic_hwaddr}
-		if [ "${nic_address}" != "0" ]; then
-			${IFCONFIG_CMD} ${myepair}a inet ${nic_address} up
-		fi
+		case "${nic_type}" in
+			ppt)
+				cbsdlogger NOTICE ${CBSD_APP}: jail ${jname}: set hwaddr for vnet interface ${myepair}: ${nic_hwaddr}
+				${IFCONFIG_CMD} ${myepair} ether ${nic_hwaddr}
+				;;
+			*)
+				cbsdlogger NOTICE ${CBSD_APP}: jail ${jname}: set hwaddr for vnet interface ${myepair}b: ${nic_hwaddr}
+				${IFCONFIG_CMD} ${myepair}b ether ${nic_hwaddr}
+				if [ "${nic_address}" != "0" ]; then
+					${IFCONFIG_CMD} ${myepair}a inet ${nic_address} up
+				fi
+		esac
 	done
 
 	[ ${quiet} -ne 1 ] && ${ECHO} "${N0_COLOR}"
@@ -824,6 +883,7 @@ case "${platform}" in
 		;;
 	*)
 		cbsdlogger NOTICE ${CBSD_APP}: ${CPUSET} /usr/local/cbsd/misc/daemonize -p ${ftmpdir}/jstart.${jname}.$$ /usr/bin/nice -n ${nice} ${JAIL_CMD} -f ${ftmpdir}/${jname}.conf -c ${jname}
+		echo "${JAIL_CMD} -f ${ftmpdir}/${jname}.conf -c ${jname}"
 		case "${quiet}" in
 			0)
 				${CPUSET} /usr/local/cbsd/misc/daemonize -p ${ftmpdir}/jstart.${jname}.$$ /usr/bin/nice -n ${nice} ${JAIL_CMD} -f ${ftmpdir}/${jname}.conf -c ${jname}
@@ -861,45 +921,53 @@ if [ ${vnet} -eq 1 ]; then
 	OIFS="${IFS}"
 	IFS=","
 	eth_seq=0
+	int_iface=
 	for i in ${epairb_list}; do
 		[ -z "${i}" ] && continue
 		IFS="${OIFS}"
 		${IFCONFIG_CMD} ${i} up
 		# we need setup lock here due to ethX name possible conflict with other jail
 		_wait_count=0
-		while [ -r ${tmpdir}/eth${eth_seq}.locked ]; do
+		_iface_rename=0
 
-			_cur_time=$( ${DATE_CMD} +%s )
-			eval $( ${STAT_CMD} -s ${tmpdir}/eth${eth_seq}.locked )
-			_diff_time=$(( _cur_time - st_mtime ))
+		if [ ${_iface_rename} -eq 1 ]; then
+			while [ -r ${tmpdir}/eth${eth_seq}.locked ]; do
+				_cur_time=$( ${DATE_CMD} +%s )
+				eval $( ${STAT_CMD} -s ${tmpdir}/eth${eth_seq}.locked )
+				_diff_time=$(( _cur_time - st_mtime ))
 
-			if [ ${_diff_time} -gt 8 ]; then
-				${IFCONFIG_CMD} eth${eth_seq} > /dev/null 2>&1
-				_ret=$?
-				if [ ${_ret} -ne 0 ]; then
-					# remove orphaned lock
-					${RM_CMD} -f ${tmpdir}/eth${eth_seq}.locked
-					break
+				if [ ${_diff_time} -gt 8 ]; then
+					${IFCONFIG_CMD} eth${eth_seq} > /dev/null 2>&1
+					_ret=$?
+					if [ ${_ret} -ne 0 ]; then
+						# remove orphaned lock
+						${RM_CMD} -f ${tmpdir}/eth${eth_seq}.locked
+						break
+					fi
 				fi
-			fi
 
-			[ ${quiet} -ne 1 ] && ${ECHO} "${N1_COLOR}jstart: eth${eth_seq} locked (${_diff_time}), waiting (${_wait_count}/12)..${N0_COLOR}"
+				[ ${quiet} -ne 1 ] && ${ECHO} "${N1_COLOR}jstart: eth${eth_seq} locked (${_diff_time}), waiting (${_wait_count}/12)..${N0_COLOR}"
 
-			_wait_count=$(( _wait_count + 1 ))
+				_wait_count=$(( _wait_count + 1 ))
 
-			if [ ${_wait_count} -gt 12 ]; then
-				_res=$( ${CAT_CMD} ${tmpdir}/eth${eth_seq}.locked )
-				jstop jname=${jname} fast=1
-				${IFCONFIG_CMD} ${i} destroy
-				log_err 1 "${N1_COLOR}${CBSD_APP}: waiting for unlock: still locked by [${_res}]: ${N2_COLOR}${tmpdir}/eth${eth_seq}.locked${N0_COLOR}"
-			fi
+				if [ ${_wait_count} -gt 12 ]; then
+					_res=$( ${CAT_CMD} ${tmpdir}/eth${eth_seq}.locked )
+					jstop jname=${jname} fast=1
+					${IFCONFIG_CMD} ${i} destroy
+					log_err 1 "${N1_COLOR}${CBSD_APP}: waiting for unlock: still locked by [${_res}]: ${N2_COLOR}${tmpdir}/eth${eth_seq}.locked${N0_COLOR}"
+				fi
 
-			sleep 1
-		done
+				sleep 1
+			done
 
-		# make lock
-		echo "${jname}" > ${tmpdir}/eth${eth_seq}.locked
-		${IFCONFIG_CMD} ${i} name eth${eth_seq} && ${IFCONFIG_CMD} eth${eth_seq} vnet ${jname}
+			# make lock
+			echo "${jname}" > ${tmpdir}/eth${eth_seq}.locked
+			${IFCONFIG_CMD} ${i} name eth${eth_seq} && ${IFCONFIG_CMD} eth${eth_seq} vnet ${jname}
+			int_iface="eth${eth_seq}"
+		else
+			${IFCONFIG_CMD} ${i} vnet ${jname}
+			int_iface="${i}"
+		fi
 
 		# more than one IPs in ip4_addr?
 		multi_ip=0
@@ -926,14 +994,14 @@ if [ ${vnet} -eq 1 ]; then
 						DHCLIENT_PROGRAM=${dhclient_program}
 					fi
 					# todo: FIB? NICE?
-					${CPUSET} ${JEXEC_CMD} ${jname} ${DHCLIENT_PROGRAM} eth${eth_seq}
+					${CPUSET} ${JEXEC_CMD} ${jname} ${DHCLIENT_PROGRAM} ${int_iface}
 					;;
 				0|[Dd][Hh][Cc][Pp])
 					# just skip
 					;;
 				*)
 					# alias ? mtu ?
-					# we need to re-build ifconfig_eth0 vars if values already exist to merge new IP address and
+					# we need to re-build ifconfig_${int_iface} vars if values already exist to merge new IP address and
 					# and do not spoil the remaining data
 
 					# Whats about Linux jail?
@@ -942,32 +1010,32 @@ if [ ${vnet} -eq 1 ]; then
 							_osname=$( ${miscdir}/elf_tables --osname /bin/sh )
 							# warning relevant for FreeBSD-based env
 							if [ "${osname}" = "freebsd" ]; then
-								${ECHO} "${W1_COLOR}warning: ${N1_COLOR}no such /etc/rc.conf: ${N2_COLOR}${name}${N1_COLOR}, skip for config ifconfig_eth0${N0_COLOR}" 1>&2
+								${ECHO} "${W1_COLOR}warning: ${N1_COLOR}no such /etc/rc.conf: ${N2_COLOR}${name}${N1_COLOR}, skip for config ifconfig_${int_iface}${N0_COLOR}" 1>&2
 							else
 								# Linux env?
 								if [ ! -r "${path}/etc/os-release" ]; then
-									${ECHO} "${W1_COLOR}warning: ${N1_COLOR}no such /etc/os-release: ${N2_COLOR}${name}${N1_COLOR}, skip for config ifconfig_eth0${N0_COLOR}" 1>&2
+									${ECHO} "${W1_COLOR}warning: ${N1_COLOR}no such /etc/os-release: ${N2_COLOR}${name}${N1_COLOR}, skip for config ifconfig_${int_iface}${N0_COLOR}" 1>&2
 								else
 									. ${path}/etc/os-release
 									case "${ID}" in
 										debian)
-											${ECHO} "${N1_COLOR}${CBSD_APP} use debian helper for config_eth0${N1_COLOR}"
+											${ECHO} "${N1_COLOR}${CBSD_APP} use debian helper for config_${int_iface}${N1_COLOR}"
 											# just test, netlink/BSD wIP
 											# mgmt for first boot only? ! -r ${data}/etc/network/interfaces.d/* ?
 #											${CAT_CMD} > ${data}/etc/network/interfaces.d/lo <<EOF
 #auto lo
 #iface lo inet loopback
 #EOF
-#											${CAT_CMD} > ${data}/etc/network/interfaces.d/eth0 <<EOF
-#auto eth0
-#iface eth0 inet static
+#											${CAT_CMD} > ${data}/etc/network/interfaces.d/${int_iface} <<EOF
+#auto ${int_iface}
+#iface ${int_iface} inet static
 #    address ${ip4_addr}/24
 #    gateway 192.168.0.1
 #
 #EOF
 											;;
 										*)
-											${ECHO} "${W1_COLOR}warning: ${N1_COLOR}skip config for ifconfig_eth0: distri not supported yet: ${N2_COLOR}${ID}${N0_COLOR}" 1>&2
+											${ECHO} "${W1_COLOR}warning: ${N1_COLOR}skip config for ifconfig_${int_iface}: distri not supported yet: ${N2_COLOR}${ID}${N0_COLOR}" 1>&2
 											;;
 									esac
 								fi
@@ -1016,25 +1084,25 @@ if [ ${vnet} -eq 1 ]; then
 						case "${myip_type}" in
 							1)
 								if [ ${multi_ip4} -lt 2 ]; then
-									find_ifconfig="ifconfig_eth0"
+									find_ifconfig="ifconfig_${int_iface}"
 								else
 									alias_num=$(( multi_ip4 - 2 ))
-									find_ifconfig="ifconfig_eth0_alias${alias_num}"
+									find_ifconfig="ifconfig_${int_iface}_alias${alias_num}"
 								fi
 								;;
 							2)
 								if [ ${multi_ip6} -lt 2 ]; then
-									find_ifconfig="ifconfig_eth0_ipv6"
+									find_ifconfig="ifconfig_${int_iface}_ipv6"
 								else
 									alias_num=$(( multi_ip6 - 2 ))
-									find_ifconfig="ifconfig_eth0_ipv6_alias${alias_num}"
+									find_ifconfig="ifconfig_${int_iface}_ipv6_alias${alias_num}"
 								fi
 								;;
 						esac
 
 						eval $( ${GREP_CMD} ^${find_ifconfig}= ${data}/etc/rc.conf 2>/dev/null | ${HEAD_CMD} -n1 )
 						if [ -n "${ifconfig_eth0}" ]; then
-							${ECHO} "${N1_COLOR}adjust IP address for eth0: ${N2_COLOR}${ip4_addr}${N0_COLOR}" 1>&2
+							${ECHO} "${N1_COLOR}adjust IP address for ${int_iface}: ${N2_COLOR}${ip4_addr}${N0_COLOR}" 1>&2
 							for _part in ${ifconfig_eth0}; do
 								[ "${_part}" = "inet" ] && continue
 								[ "${_part}" = "inet6" ] && continue
@@ -1056,7 +1124,7 @@ if [ ${vnet} -eq 1 ]; then
 		done
 
 		# release lock
-		${RM_CMD} -f ${tmpdir}/eth${eth_seq}.locked
+		[ -r ${tmpdir}/eth${eth_seq}.locked ] && ${RM_CMD} -f ${tmpdir}/eth${eth_seq}.locked
 		eth_seq=$(( eth_seq + 1 ))
 		IFS=","
 	done

@@ -762,11 +762,24 @@ if [ -n "${jailnic_temp_sql}" ]; then
 else
 	[ ! -r ${jailsysdir}/${jname}/local.sqlite ] && /usr/local/bin/cbsd ${miscdir}/updatesql ${jailsysdir}/${jname}/local.sqlite ${distdir}/share/local-jailnic.schema jailnic
 	# create default record
-	cbsdsqlrw ${jailsysdir}/${jname}/local.sqlite "INSERT INTO jailnic ( name,nic_order,nic_slot,nic_parent ) VALUES ( \"epairb\",\"0\",\"0\",\"auto\" )"
+
+	tmp_type=${interface%%#*}		# cut all after '#'
+	tmp_iface=${interface##*#}		# cut all before '#'
+
+	case "${tmp_type}" in
+		ppt|epair|ovs)
+			cbsdsqlrw ${jailsysdir}/${jname}/local.sqlite "INSERT INTO jailnic ( name,nic_order,nic_slot,nic_parent ) VALUES ( '${tmp_iface}','0','0','auto' )"
+			;;
+		*)
+			cbsdsqlrw ${jailsysdir}/${jname}/local.sqlite "INSERT INTO jailnic ( name,nic_order,nic_slot,nic_parent ) VALUES ( 'epairb','0','0','auto' )"
+			;;
+	esac
+
+	unset tmp_iface= tmp_type=
 
 	if [ ${vnet} -eq 1 ]; then
 		# created from cli? inherit nic_parent from interface
-		cbsdsqlrw ${jailsysdir}/${jname}/local.sqlite "UPDATE jailnic SET nic_parent=\"${interface}\""
+		cbsdsqlrw ${jailsysdir}/${jname}/local.sqlite "UPDATE jailnic SET nic_parent='${interface}'"
 	fi
 fi
 
