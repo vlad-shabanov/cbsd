@@ -115,7 +115,7 @@ main(int argc, char *argv[])
 
 	libssh2_session_set_blocking(session, 1);
 
-	rc = libssh2_session_startup(session, sock);
+	rc = libssh2_session_handshake(session, sock);
 	if (rc) {
 		fprintf(stderr, "Failure establishing SSH session: %d\n", rc);
 		return -1;

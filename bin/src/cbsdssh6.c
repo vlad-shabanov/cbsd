@@ -180,7 +180,7 @@ main(int argc, char *argv[])
 		return 1;
 	}
 	session = libssh2_session_init();
-	if (libssh2_session_startup(session, sock)) {
+	if (libssh2_session_handshake(session, sock)) {
 		fprintf(stderr, "Failure establishing SSH session\n");
 		return 1;
 	}
