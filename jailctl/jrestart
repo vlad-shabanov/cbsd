@@ -68,8 +68,6 @@ for jname in ${jail_list}; do
 		continue
 	fi
 
-	[ ${status} -eq 0 -o ${jid} -eq 0 ] && continue
-
 	# CBSD QUEUE
 	if [ "${mod_cbsd_queue_enabled}" = "YES" -a -z "${MOD_CBSD_QUEUE_DISABLED}" ]; then
 		[ -n "${cbsd_jail_queue_name}" ] && ${cbsd_queue_backend} cbsd_queue_name=${cbsd_jail_queue_name} id=${jname} cmd=jrestart status=1 workdir="${workdir}"
@@ -81,7 +79,7 @@ for jname in ${jail_list}; do
 	jstop jname=${jname}
 	jstart jname=${jname}
 
-	myjid=$( cbsdsqlro local SELECT jid FROM jails WHERE jname=\"${jname}\" 2>/dev/null )
+	myjid=$( cbsdsqlro local "SELECT jid FROM jails WHERE jname='${jname}'" 2>/dev/null )
 
 	[ -z "${myjid}" ] && myjid=0
 
@@ -105,3 +103,5 @@ end_time=$( ${DATE_CMD} +%s )
 diff_time=$(( end_time - st_time ))
 diff_time=$( displaytime ${diff_time} )
 ${ECHO} "${N1_COLOR}${CBSD_APP} done ${N2_COLOR}in ${diff_time}${N0_COLOR}"
+
+exit 0
