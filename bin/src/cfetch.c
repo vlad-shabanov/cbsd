@@ -180,7 +180,7 @@ fetch_files(char *urls, char *fout)
 
 	if(!res) {
 		/* check the size */
-		double cl;
+		curl_off_t cl;
 		res = curl_easy_getinfo(curl_handle, CURLINFO_CONTENT_LENGTH_DOWNLOAD_T, &cl);
 		if(!res) {
 			//printf("Size: %.0f\n", cl);
@@ -286,13 +286,16 @@ fetch_files(char *urls, char *fout)
 	 * Please note that printf et al. are NOT safe to use in signal
 	 * handlers. Look for async safe functions.
 	 */
+
 	if (speedtest == 1) {
-		double dl;
-		 CURLcode res;
+		curl_off_t dl;
+		CURLcode res;
 		/* check the size */
 		res = curl_easy_getinfo(curl_handle, CURLINFO_SIZE_DOWNLOAD_T, &dl);
+
 		if(!res) {
-			printf("%.0f\n", dl / diff_time);
+			printf("%" CURL_FORMAT_CURL_OFF_T, dl / diff_time);
+			printf("\n");
 		}
 	}
 
@@ -309,18 +312,18 @@ handle_signal(int signal)
 
 	// Find out which signal we're handling
 	switch (signal) {
-	case SIGHUP:
-		signal_name = "SIGHUP";
-		break;
-	case SIGUSR1:
-		signal_name = "SIGUSR1";
-		break;
-	case SIGINT:
-		printf("Caught SIGINT, exiting now\n");
-		exit(0);
-	default:
-		fprintf(stderr, "Caught wrong signal: %d\n", signal);
-		return;
+		case SIGHUP:
+			signal_name = "SIGHUP";
+			break;
+		case SIGUSR1:
+			signal_name = "SIGUSR1";
+			break;
+		case SIGINT:
+			printf("Caught SIGINT, exiting now\n");
+			exit(0);
+		default:
+			fprintf(stderr, "Caught wrong signal: %d\n", signal);
+			return;
 	}
 
 	gettimeofday(&now_time, NULL);
@@ -331,12 +334,13 @@ handle_signal(int signal)
 	}
 
 	if (speedtest == 1) {
-		double dl;
-		 CURLcode res;
+		curl_off_t dl;
+		CURLcode res;
 		/* check the size */
 		res = curl_easy_getinfo(curl_handle, CURLINFO_SIZE_DOWNLOAD_T, &dl);
 		if(!res) {
-			printf("%.0f\n", dl / diff_time);
+			printf("%" CURL_FORMAT_CURL_OFF_T, dl / diff_time);
+			printf("\n");
 		}
 	}
 
