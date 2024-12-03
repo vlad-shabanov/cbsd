@@ -15,6 +15,8 @@ Exploring the CBSD virtual environment management framework](https://eerielinux.
 - [Broker driven CBSD cluster (example)](general/)
 - [CBSD integration with PHPIPAM (IP management)](general/wf_ipam.md)
 - [API module: private cloud via API](general/cbsd_api.md)
+- [About fetch work with CBSD (bases,images,VM), CBSD mirrors](general/cbsd_fetch.md)
+
 
 <!---
 - [What you need to know about CBSD](general/cbsd_additional.md)
@@ -32,7 +34,6 @@ Exploring the CBSD virtual environment management framework](https://eerielinux.
 - [How does a helper for CBSD image](/wf_imghelper_ssi.md) :: imghelper
 - [cbsd command history](/wf_history_ssi.md) :: CBSD history
 - [Modification which are carried out by CBSD scripts in FreeBSD](custom_freecbsd.md)
-- [About fetch work with CBSD, loading FreeBSD bases, templates and images of VMs](cbsd_fetch.md)
 - [cbsd taskd](cbsd_taskd.md) :: task, taskls
 - [FreeBSD: Xorg in jail](xorg_in_jail.md)
 - [FreeBSD: CBSD and bhyve](bhyve.md)

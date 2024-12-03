@@ -1,25 +1,4 @@
-[View source on GitHub](https://github.com/cbsd/cbsd)
-
-FreeBSD virtual environment management and repository
-
-- [About](http://www.bsdstore.ru/en/about.html)
-- [News](http://www.bsdstore.ru/en/news.html)
-- [Screenshots](http://www.bsdstore.ru/en/screenshots.html)
-- [Tutorial](http://www.bsdstore.ru/en/tutorial.html)
-- [Documentation »](http://www.bsdstore.ru/en/docs.html)  - [Articles by author's](http://www.bsdstore.ru/en/articles.html)
-  - [Articles and press](http://www.bsdstore.ru/en/press.html)
-- [Marketplace(Templates)](https://marketplace.bsdstore.ru)
-- [Support the project](http://www.bsdstore.ru/en/donate.html)
-- [bhyve.cloud](http://www.bsdstore.ru/en/bhyve-cloud.html)
-- Lang »  - [Русский](http://www.bsdstore.ru/ru/cbsd_fetch.html)
-  - [English](http://www.bsdstore.ru/en/cbsd_fetch.html)
-  - [Deutsch](http://www.bsdstore.ru/de/cbsd_fetch.html)
-
-2020-10 upd: we reached the first fundraising goal and rented a server in Hetzner for development! Thank you for [donating](https://www.patreon.com/clonos) !
-
-Attention! I apologize for the automatic translation of this text. You can improve it by sending me a more correct version of the text or fix html pages via [GITHUB repository](https://github.com/cbsd/cbsd-wwwdoc).
-
-# fetch
+# About fetch work with CBSD (bases,images,VM), CBSD mirrors
 
 ## Description
 
@@ -96,7 +75,7 @@ If there are no updates, you can help the project (and make the same users happy
 If you are at your own risk and want to take an ISO image, despite the discrepancy between the amounts of CRC, you have two options:
 
 - Adjust the **sha256sum** value in a particular profile by setting **sha256sum=0**. When **sha256sum=0**, this causes **CBSD** to skip the CRC check.
-Refer to the section [CBSD profiles](http://www.bsdstore.ru/en/13.0.x/wf_profiles_ssi.html) for details on how to overwrite certain parameters.
+Refer to the section [CBSD profiles](../jail/wf_profiles_ssi.md) for details on how to overwrite certain parameters.
 - Prevent CRC checksums globally through the **BSD\_ISO\_SKIP\_CHECKSUM=\[yes\|no\]** environment variable (or configuration file), for example: env CBSD\_ISO\_SKIP\_CHECKSUM=yes cbsd bstart ..
 
 To automatically update CRC amounts in profiles, you can use the **fetch\_iso** script, which we will discuss below.
@@ -134,108 +113,98 @@ Step-by-step setup of the mirror with periodic synchronization via [rsync](http:
 1) Install packages:
 
 ```
-			pkg install -y rsync nginx
-
+pkg install -y rsync nginx
 ```
 
 2) Activate nginx services:
 
 ```
-		sysrc nginx_enable="YES"
-
+sysrc nginx_enable="YES"
 ```
 
 3) Create _/usr/local/www/cbsd-mirror_ directory where we will save ISO images, create a log file for rsync and set the right permissions for the **www** user, from which we will synchronize
 
 ```
-		mkdir -p /usr/local/www/cbsd-mirror/iso /usr/local/www/cbsd-mirror/cloud
-		touch /var/log/cbsd_mirror.log /var/log/cbsd_mirror_cloud.log
-		chown -R www:www /usr/local/www/cbsd-mirror /var/log/cbsd_mirror.log /var/log/cbsd_mirror_cloud.log
-
+mkdir -p /usr/local/www/cbsd-mirror/iso /usr/local/www/cbsd-mirror/cloud
+touch /var/log/cbsd_mirror.log /var/log/cbsd_mirror_cloud.log
+chown -R www:www /usr/local/www/cbsd-mirror /var/log/cbsd_mirror.log /var/log/cbsd_mirror_cloud.log
 ```
 
 4) Correct **nginx.conf**, specifying **server\_name** as correct name of the server (in this example: **electrode.bsdstore.ru**) and set path to root directory:
 
 ```
-		cat > /usr/local/etc/nginx/nginx.conf <<EOF
-		user nobody;
-		worker_processes  2;
+cat > /usr/local/etc/nginx/nginx.conf <<EOF
+user nobody;
+worker_processes  2;
 
-		error_log /var/null;
-		pid /var/run/nginx.pid;
+error_log /var/null;
+pid /var/run/nginx.pid;
 
-		events {
-			worker_connections  1024;
-			kqueue_changes  1024;
-			use kqueue;
-		}
+events {
+	worker_connections  1024;
+	kqueue_changes  1024;
+	use kqueue;
+}
 
-		http {
-			server_tokens off;
-			include       mime.types;
-			default_type  application/octet-stream;
+http {
+	server_tokens off;
+	include       mime.types;
+	default_type  application/octet-stream;
 
-			log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
-				'$status $body_bytes_sent "$http_referer" '
-				'"$http_user_agent" "$http_x_forwarded_for"';
+	log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+		'$status $body_bytes_sent "$http_referer" '
+		'"$http_user_agent" "$http_x_forwarded_for"';
 
-			error_log       /dev/null;
-			access_log      /dev/null;
-			client_header_timeout  3m;
-			client_body_timeout    3m;
-			send_timeout           3m;
-			client_header_buffer_size    1k;
-			large_client_header_buffers  4 8k;
-			client_body_buffer_size 32K;
-			log_not_found off;
+	error_log       /dev/null;
+	access_log      /dev/null;
+	client_header_timeout  3m;
+	client_body_timeout    3m;
+	send_timeout           3m;
+	client_header_buffer_size    1k;
+	large_client_header_buffers  4 8k;
+	client_body_buffer_size 32K;
+	log_not_found off;
 
-			client_max_body_size 20m;
+	client_max_body_size 20m;
 
-			gzip off;
-			output_buffers   1 32k;
-			postpone_output  1460;
-			reset_timedout_connection  on;
-			sendfile         on;
-			tcp_nopush       on;
-			tcp_nodelay      on;
-			send_lowat       12000;
-			keepalive_timeout  8;
+	gzip off;
+	output_buffers   1 32k;
+	postpone_output  1460;
+	reset_timedout_connection  on;
+	sendfile         on;
+	tcp_nopush       on;
+	tcp_nodelay      on;
+	send_lowat       12000;
+	keepalive_timeout  8;
 
-			server {
-				listen       *:80;
-				#listen      [::]:80;	# Enable IPv6
+	server {
+		listen       *:80;
+		#listen      [::]:80;	# Enable IPv6;
 
-				server_name  electrode.bsdstore.ru;
-				access_log /var/log/nginx/electrode.bsdstore.ru.acc main;
-				error_log /var/log/nginx/electrode.bsdstore.ru.err;
-
-				root   /usr/local/www/cbsd-mirror;
-			}
-		}
-		EOF
-
+		server_name  cbsd-mirror.example.com;		# set valid server_name;
+		access_log /var/log/nginx/cbsd-mirror.example.com.acc main;
+		error_log /var/log/nginx/cbsd-mirror.example.com.err;
+		root   /usr/local/www/cbsd-mirror;
+	}
+}
+EOF
 ```
 
 5) Create an entry in crontab with the rsync call for 15 minutes through lockf to stop duplication of processes
 
 ```
-		cat > /etc/cron.d/cbsd_mirror <<EOF
-		SHELL=/bin/sh
-		PATH=/etc:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
-		*/15    *       *       *       *       www /usr/bin/lockf -s -t0 /tmp/cbsd_mirror.lock /usr/local/bin/rsync -a --delete rsync://electro.bsdstore.ru/iso/ /usr/local/www/cbsd-mirror/iso/ > /var/log/cbsd_mirror.log 2>&1
-		*/15    *       *       *       *       www /usr/bin/lockf -s -t0 /tmp/cbsd_mirror_cloud.lock /usr/local/bin/rsync -a --delete rsync://electro.bsdstore.ru/cloud/ /usr/local/www/cbsd-mirror/cloud/ > /var/log/cbsd_mirror_cloud.log 2>&1
-		EOF
-
+cat > /etc/cron.d/cbsd_mirror <<EOF
+SHELL=/bin/sh
+PATH=/etc:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
+*/15    *       *       *       *       www /usr/bin/lockf -s -t0 /tmp/cbsd_mirror.lock /usr/local/bin/rsync -a --delete rsync://mirror.convectix.com/iso/ /usr/local/www/cbsd-mirror/iso/ > /var/log/cbsd_mirror.log 2>&1
+*/15    *       *       *       *       www /usr/bin/lockf -s -t0 /tmp/cbsd_mirror_cloud.lock /usr/local/bin/rsync -a --delete rsync://mirror.convectix.com/cloud/ /usr/local/www/cbsd-mirror/cloud/ > /var/log/cbsd_mirror_cloud.log 2>&1
+EOF
 ```
 
 6) Start WEB service
 
 ```
-		service nginx restart
-
+service nginx restart
 ```
 
 After synchronizing the directory and verifying that the ISO images from your resource are available to the rest of the world - you can send [Pull Request](https://github.com/cbsd/cbsd-vmprofiles/pulls) in [profiles project](https://github.com/cbsd/cbsd-vmprofiles) with added your servers in **cbsd\_iso\_mirrors** params of VM config files.
-
-Copyright © 2013—2024 CBSD Team.
-
