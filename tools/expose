@@ -201,7 +201,7 @@ pf_del()
 
 fw_expose_add()
 {
-	local _ret _inaddr
+	local _ret= _inaddr= _res= _test=
 
 	[ "${inaddr}" = "nodeip" ] && inaddr="0"
 
@@ -242,16 +242,27 @@ fw_expose_add()
 
 	case "${proto}" in
 		tcp)
-			res=$( ${NC_CMD} -w1 -z ${_inaddr} ${in} 2>/dev/null )
+			_test="${NC_CMD} -w1 -z ${_inaddr} ${in}"
 			;;
 		udp)
-			res=$( ${NC_CMD} -u -w1 -z ${_inaddr} ${in} 2>/dev/null )
+			_test="${NC_CMD} -u -w1 -z ${_inaddr} ${in}"
 			;;
 	esac
 
-	if [ $? -eq 0 ]; then
-		${ECHO} "${W1_COLOR}${CBSD_APP} warning: ${N1_COLOR}port already in use on ${_inaddr}: ${N2_COLOR}${proto}/${in}${N0_COLOR}"
-		return 1
+	${_test} 2>/dev/null
+	_ret=$?
+
+	if [ ${_ret} -eq 0 ]; then
+		${ECHO} "${W1_COLOR}${CBSD_APP} warning: ${N1_COLOR}port already in use on ${_inaddr}?: ${N2_COLOR}${proto}/${in}${N0_COLOR}"
+		case "${proto}" in
+			tcp)
+				${ECHO} "${N1_COLOR}Test string: '${N2_COLOR}${_test}${N1_COLOR}' (check errcode)${N0_COLOR}"
+				return 1
+				;;
+			udp)
+				${ECHO} "${N1_COLOR}Test string: '${N2_COLOR}${_test}${N1_COLOR}' (check errcode). Possible false positive for UDP, let's try to continue${N0_COLOR}"
+				;;
+		esac
 	fi
 
 	if [ -z "${fromips}" ]; then
