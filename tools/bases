@@ -23,8 +23,13 @@ ${H3_COLOR}Examples${N0_COLOR}:
  # cbsd bases
  # cbsd bases display=ver,arch,source
 
-"
+${H3_COLOR}See also:${N0_COLOR}
 
+ # cbsd kernel --help
+ # cbsd register_base --help
+ # cbsd unregister_base --help
+
+"
 
 . ${subrdir}/nc.subr
 . ${system}

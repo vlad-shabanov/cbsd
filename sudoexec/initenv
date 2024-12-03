@@ -1167,6 +1167,9 @@ phase8()
 	local SECCMD _i _cmd _lnk _dst _modulename _moduledir
 	${ECHO} "${N1_COLOR}[Stage 8: ${N2_COLOR}modules${N1_COLOR}]${N0_COLOR}"
 
+	# buildah module
+	[ -n "${BUILDAH_CMD}" ] && /usr/local/bin/cbsd buildah
+
 	if [ ! -d "${moduledir}" ]; then
 		${MKDIR_CMD} -p -m 0775 ${moduledir}
 		${CHOWN_CMD} root:cbsd ${moduledir}

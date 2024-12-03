@@ -883,7 +883,7 @@ case "${platform}" in
 		;;
 	*)
 		cbsdlogger NOTICE ${CBSD_APP}: ${CPUSET} /usr/local/cbsd/misc/daemonize -p ${ftmpdir}/jstart.${jname}.$$ /usr/bin/nice -n ${nice} ${JAIL_CMD} -f ${ftmpdir}/${jname}.conf -c ${jname}
-		echo "${JAIL_CMD} -f ${ftmpdir}/${jname}.conf -c ${jname}"
+		#echo "${JAIL_CMD} -f ${ftmpdir}/${jname}.conf -c ${jname}"
 		case "${quiet}" in
 			0)
 				${CPUSET} /usr/local/cbsd/misc/daemonize -p ${ftmpdir}/jstart.${jname}.$$ /usr/bin/nice -n ${nice} ${JAIL_CMD} -f ${ftmpdir}/${jname}.conf -c ${jname}

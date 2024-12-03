@@ -1,0 +1,114 @@
+#!/usr/local/bin/cbsd
+#v14.2.0
+MYARG=""
+MYOPTARG=""
+MYDESC="buildah helper"
+CBSDMODULE="sys"
+ADDHELP="
+${H3_COLOR}Description${N0_COLOR}:
+
+buildah helper
+
+${H3_COLOR}Options${N0_COLOR}:
+
+
+${H3_COLOR}Examples${N0_COLOR}:
+
+
+${H3_COLOR}See also${N0_COLOR}:
+
+"
+. ${cbsdinit}
+. ${system}
+
+[ -z "${BUILDAH_CMD}" -o ! -x "${BUILDAH_CMD}" ] && err 1 "no buildah executable. please install 'buildah' package first then re-run 'cbsd initenv'"
+
+# olevole notes: for some reason, /usr/local/etc/containers/storage.conf preferred, bug/report ?
+#
+#17891: faccessat(AT_FDCWD,"/usr/local/etc/containers/storage.conf",F_OK,0x0) = 0 (0x0)
+#17891: faccessat(AT_FDCWD,"/usr/jails/.config/containers/storage.conf",F_OK,0x0) = 0 (0x0)
+#17891: faccessat(AT_FDCWD,"/usr/jails/.config/containers/storage.conf",F_OK,0x0) = 0 (0x0)
+#17891: fstatat(AT_FDCWD,"/usr/jails/.config/containers/storage.conf",{ mode=-rw-rw-r-- ,inode=37260303,size=221,blksize=32768 },0x0) = 0 (0x0)
+#17891: open("/usr/jails/.config/containers/storage.conf",O_RDONLY|O_CLOEXEC,00) = 6 (0x6)                           <<<<<< ok
+#17891: faccessat(AT_FDCWD,"/usr/local/etc/containers/storage.conf",F_OK,0x0) = 0 (0x0)
+#17891: fstatat(AT_FDCWD,"/usr/local/etc/containers/storage.conf",{ mode=-rw-r--r-- ,inode=49038701,size=5752,blksize=32768 },0x0) = 0 (0x0)
+#17891: open("/usr/local/etc/containers/storage.conf",O_RDONLY|O_CLOEXEC,00) = 6 (0x6)
+
+[ ! -d "${workdir}/.config/containers" ] && ${MKDIR_CMD} -p ${workdir}/.config/containers
+[ ! -d "${workdir}/basejail/buildah/run/storage" ] && ${MKDIR_CMD} -p ${workdir}/basejail/buildah/run/storage
+[ ! -d "${workdir}/basejail/buildah/db/storage" ] && ${MKDIR_CMD} -p ${workdir}/basejail/buildah/db/storage
+
+storage_driver="zfs"
+
+case "${zfsfeat}" in
+	1)
+		true
+		;;
+	*)
+		storage_driver="vfs"
+		;;
+esac
+
+${CAT_CMD} > ${workdir}/.config/containers/storage.conf <<EOF
+[storage]
+driver = "${storage_driver}"
+runroot = "${workdir}/basejail/buildah/run/storage"
+graphroot = "${workdir}/basejail/buildah/db/storage"
+[storage.options]
+additionalimagestores = [
+]
+[storage.options.overlay]
+mountopt = "nodev"
+EOF
+
+engine_runtime="ocijail"
+
+engine_runtimes_bin=$( which ocijail )
+[ ! -x "${engine_runtimes_bin}" ] && err 1 "no such ocijail"
+
+${CAT_CMD} > ${workdir}/.config/containers/containers.conf <<EOF
+[containers]
+default_capabilities = [
+  "CHOWN",
+  "DAC_OVERRIDE",
+  "FOWNER",
+  "FSETID",
+  "KILL",
+  "NET_BIND_SERVICE",
+  "SETFCAP",
+  "SETGID",
+  "SETPCAP",
+  "SETUID",
+  "SYS_CHROOT"
+]
+default_sysctls = [
+  "net.ipv4.ping_group_range=0 0",
+]
+[secrets]
+[secrets.opts]
+[network]
+[engine]
+runtime = "${engine_runtime}"
+runtime_supports_json = ["crun", "runc", "kata", "runsc", "krun", "ocijail"]
+[engine.runtimes]
+ocijail = [
+  "${engine_runtimes_bin}",
+]
+[engine.volume_plugins]
+[machine]
+EOF
+
+
+${ECHO} "${N1_COLOR}Buildah integration for CBSD enabled, direct usage string:${N0_COLOR}"
+${ECHO} "${N2_COLOR}  env XDG_CONFIG_HOME=\"${workdir}/.config\" ${BUILDAH_CMD} --root ${workdir}/basejail/buildah <args>${N0_COLOR}"
+${ECHO} "${N1_COLOR}The FreeBSD port of the Buildah image building tool is experimental and should be used for evaluation and testing purposes only.${N0_COLOR}"
+if [ ${zfsfeat} -eq 0 ]; then
+	${GREP_CMD} -q "^driver =" /usr/local/etc/containers/storage.conf | ${GREP_CMD} -q vfs
+	_ret=$?
+	if [ ${_ret} -ne 0 ]; then
+		${ECHO} "${W1_COLOR}Warning: ${N1_COLOR}zfs_feature off. Please re-configure 'storage.conf' to use the vfs driver:${N0_COLOR}"
+		${ECHO} "${N2_COLOR}# sed -I .bak -e 's/driver = \"zfs\"/driver = \"vfs\"/' /usr/local/etc/containers/storage.conf${N0_COLOR}"
+	fi
+fi
+
+exit 0

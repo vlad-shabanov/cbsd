@@ -23,7 +23,9 @@ find_available_free_cidr4()
 			_res=$( ${IP_CMD} a  2>/dev/null | ${AWK_CMD} '/inet [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\//{print $2}' )
 			;;
 		*)
+			# notes: ifconfig -f cidr in newest version only, still not exist in XigmaNAS and DFLY
 			_res=$( ${IFCONFIG_CMD} -f cidr 2>/dev/null | ${AWK_CMD} '/inet [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\//{print $2}' )
+			[ -z "${_res}" ] && _res=$( ${IFCONFIG_CMD} 2>/dev/null | ${AWK_CMD} '/inet [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/{print $2"/24"}' )
 			;;
 	esac
 

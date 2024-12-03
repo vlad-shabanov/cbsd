@@ -1,7 +1,7 @@
 #!/usr/local/bin/cbsd
 #v13.0.8
 MYARG="mode"
-MYOPTARG="md5 name path source"
+MYOPTARG="md5 name path source platform"
 MYDESC="Manage environment images"
 CBSDMODULE="sys"
 ADDHELP="
@@ -21,6 +21,9 @@ When registering, the image will be unpacked into a separate ZFS dataset
 and a snapshot <dataset>@start will be created. This snapshot will be 
 used as 'zfs_snapsrc=', e.g: 'cbsd jcreate zfs_snapsrc=<dataset>@start ...'
 
+With help of 'buildah' package, you can also receive and register OCI images 
+from the Docker-compatible registry.
+
 ${H3_COLOR}Options${N0_COLOR}:
 
  ${N2_COLOR}mode${N0_COLOR} - can be:
@@ -35,7 +38,10 @@ ${H3_COLOR}Examples${N0_COLOR}:
 
  # cbsd images mode=register name=golds
  # cbsd images mode=register path=/usr/jails/export/golds.img
- # cbsd images mode=register path=\"https://dl.bsdstore.ru/img/amd64/amd64/14.0/redis/redis.img\"
+ # cbsd images mode=register path=\"https://dl.convectix.com/img/amd64/amd64/14.2/redis/redis.img\"
+ # cbsd images mode=register path=docker.io/convectix/freebsd14-base
+ # cbsd images mode=register path=docker.io/library/memcached platform=linux
+ # cbsd images mode=register path=docker.io/library/alpine platform=linux
  # cbsd images mode=list
 
 "
@@ -54,7 +60,7 @@ source=
 # jaildatadir must be set
 get_zfs_image_snap()
 {
-	local _zfssrc _zfssrc_snap
+	local _zfssrc= _zfssrc_snap=
 
 	[ -z "${1}" ] && return 1
 
@@ -89,7 +95,9 @@ get_zfs_image_snap()
 
 images_register()
 {
-	local _md5 _size _ret _res _tmpfile _remove_source=0
+	local _md5= _size= _ret= _res=
+	local _tmpfile= _remove_source=0
+	local _imgname= _imgpath= _buildah_platform=
 
 	[ ! -r ${dbdir}/images.sqlite ] && ${miscdir}/updatesql ${dbdir}/images.sqlite ${distdir}/share/local-images.schema images
 
@@ -103,28 +111,162 @@ images_register()
 		[ ! -r ${path} ] && stderr 1 "${N1_COLOR}${CBSD_APP} error: file not found ${N2_COLOR}${path}${N0_COLOR}"
 	else
 		[ -z "${path}" ] && stderr 1 "${N1_COLOR}${CBSD_APP} error: ${N2_COLOR}path= or name=${N1_COLOR} is mandatory${N0_COLOR}"
-		prefix4=$( substr --pos=0 --len=4 --str="${path}" )
-		# fetch from remote
-		if [ "${prefix4}" = "http" ]; then
-			_md5=$( ${miscdir}/cbsd_md5 "${path}" )
+		_res=$( ${BASENAME_CMD} "${path}" )
+		_ret=0
+		_md5=$( ${miscdir}/cbsd_md5 "${path}" )
+		echo "${_res}" | ${GREP_CMD} -q "\.img$"
+		_ret=$?
+		if [ ${_ret} -eq 0 ]; then
+			# is .img$
+			prefix4=$( substr --pos=0 --len=4 --str="${path}" )
 
-			_res=$( cbsdsqlro images "SELECT source FROM images WHERE md5=\"${_md5}\"" 2>/dev/null )
-			[ -n "${_res}" ] && stderr 1 "${N1_COLOR}${CBSD_APP} error: ${N2_COLOR}${_md5}${N1_COLOR} already exist: source: ${N2_COLOR}${source}${N0_COLOR}"
+			# fetch from remote
+			if [ "${prefix4}" = "http" ]; then
+				_res=$( cbsdsqlro images "SELECT source FROM images WHERE md5='${_md5}'" 2>/dev/null )
+				[ -n "${_res}" ] && stderr 1 "${N1_COLOR}${CBSD_APP} error: ${N2_COLOR}${_md5}${N1_COLOR} already exist, source: ${N2_COLOR}${source}${N0_COLOR}"
+				${ECHO} "${N1_COLOR}${CBSD_APP}: remote resource: ${N2_COLOR}${path}${N0_COLOR}" 1>&2
+				_tmpfile="${importdir}/${_md5}.img"
+				${ECHO} "${N1_COLOR}${CBSD_APP}: ${FETCH_CMD} -o \"${_tmpfile}\" \"${path}\"${N0_COLOR}" 1>&2
+				${FETCH_CMD} -o "${_tmpfile}" "${path}"
+				[ ! -r ${_tmpfile} ] && err 1 "${N1_COLOR}${CBSD_APP} error: unable to fetch: ${N2_COLOR}${path} -> ${_tmpfile}${N0_COLOR}"
+				opath="${path}"
+				_file=$( ${BASENAME_CMD} ${path} )
+				name=$( echo ${_file} | ${SED_CMD} 's:\.img::g' )
+				source="${path}"
+				_omd5="${md5}"
+				path="${_tmpfile}"
+				_remove_source=1
+			fi
+		else
+			if [ -z "${BUILDAH_CMD}" ]; then
+				${ECHO} "${N1_COLOR}${CBSD_APP}: buildah command not found. If ${path} is a registry resource,"
+				${ECHO} "please install package then re-run 'cbsd initenv': ${N2_COLOR}buildah${N0_COLOR}"
+			else
+				${ECHO} "${N1_COLOR}${CBSD_APP}: let's try using the ${BUILDAH_CMD} utility...${N0_COLOR}"
 
-			${ECHO} "${N1_COLOR}${CBSD_APP}: remote resource: ${N2_COLOR}${path}${N0_COLOR}" 1>&2
-			_tmpfile="${importdir}/${_md5}.img"
-			${ECHO} "${N1_COLOR}${CBSD_APP}: ${FETCH_CMD} -o \"${_tmpfile}\" \"${path}\"${N0_COLOR}" 1>&2
-			${FETCH_CMD} -o "${_tmpfile}" "${path}"
-			[ ! -r ${_tmpfile} ] && err 1 "${N1_COLOR}${CBSD_APP} error: unable to fetch: ${N2_COLOR}${path} -> ${_tmpfile}${N0_COLOR}"
-			opath="${path}"
-			_file=$( ${BASENAME_CMD} ${path} )
-			name=$( echo ${_file} | ${SED_CMD} 's:\.img::g' )
-			source="${path}"
-			_omd5="${md5}"
-			path="${_tmpfile}"
-			_remove_source=1
+				# doesn't work? for some reason ignored
+				export XDG_CONFIG_HOME="${workdir}/.config"
+				[ ! -d "${workdir}/basejail/buildah" ] && ${MKDIR_CMD} -p ${workdir}/basejail/buildah
+
+				# --platform linux
+				[ -n "${oplatform}" ] && platform="${oplatform}"
+				_buildah_platform=$( echo ${platform} | ${TR_CMD} '[:upper:]' '[:lower:]' )
+				_imgname=$( ${BUILDAH_CMD} --root ${workdir}/basejail/buildah pull --platform ${_buildah_platform} ${path} 2>/tmp/images.$$ )
+				_ret=$?
+				if [ ${_ret} -ne 0 -o -z "${_imgname}" ]; then
+					${ECHO} "${N1_COLOR}${CBSD_APP}: unable to pull${N0_COLOR}"
+					if [ -r /tmp/images.$$ ]; then
+						${CAT_CMD} /tmp/images.$$
+						${RM_CMD} -f /tmp/images.$$
+					fi
+					exit 1
+				fi
+				[ -r /tmp/images.$$ ] && ${RM_CMD} -f /tmp/images.$$
+				echo "Image name: ${_imgname}"
+				if [ -n "${NOCOLOR}" ]; then
+					${BUILDAH_CMD} --root ${workdir}/basejail/buildah images | ${GREP_CMD} "${path}"
+					_ret=$?
+				else
+					${BUILDAH_CMD} --root ${workdir}/basejail/buildah images | ${ENV_CMD} GREP_COLORS='mt=37;45' GREP_COLOR='37;45' ${GREP_CMD} --colour=always "${path}"
+					_ret=$?
+				fi
+
+				if [ ${_ret} -ne 0 ]; then
+					err 1 "${N1_COLOR}${CBSD_APP}: buildah image not found: ${N2_COLOR}${path}${N0_COLOR}"
+				fi
+
+				echo "${BUILDAH_CMD} --root ${workdir}/basejail/buildah from --name ${_md5} ${_imgname}"
+				_res=$( ${BUILDAH_CMD} --root ${workdir}/basejail/buildah from --name ${_md5} ${_imgname} 2>/tmp/images.$$ )
+				_ret=$?
+				if [ ${_ret} -ne 0 -o -z "${_res}" ]; then
+					${ECHO} "${N1_COLOR}${CBSD_APP}: unable to create buildah container from ${_imgname}${N0_COLOR}"
+					if [ -r /tmp/images.$$ ]; then
+						${CAT_CMD} /tmp/images.$$
+						${RM_CMD} -f /tmp/images.$$
+					fi
+					exit 1
+				fi
+				[ -r /tmp/images.$$ ] && ${RM_CMD} -f /tmp/images.$$
+				echo "image: ${_res}"
+				_imgpath=$( ${BUILDAH_CMD} --root ${workdir}/basejail/buildah mount ${_res} 2>/tmp/images.$$ )
+				_ret=$?
+				if [ ${_ret} -ne 0 -o -z "${_res}" ]; then
+					${ECHO} "${N1_COLOR}${CBSD_APP}: unable to mount buildah container from ${_res}${N0_COLOR}"
+					if [ -r /tmp/images.$$ ]; then
+						${CAT_CMD} /tmp/images.$$
+						${RM_CMD} -f /tmp/images.$$
+					fi
+					exit 1
+				fi
+				[ -r /tmp/images.$$ ] && ${RM_CMD} -f /tmp/images.$$
+				echo "imgpath: ${_imgpath}"
+
+				case "${_buildah_platform}" in
+					freebsd)
+						platform="FreeBSD"
+						;;
+					linux)
+						platform="Linux"
+						;;
+					netbsd)
+						platform="NetBSD"
+						;;
+				esac
+
+				##ZFS
+				if [ ${zfsfeat} -eq 1 ]; then
+					jcreate jname="${_md5}" host_hostname=${_md5}.my.domain ver=empty baserw=1 pkg_bootstrap=0 floatresolv=0 applytpl=0 etcupdate_init=0
+					_ret=$?
+					[ ${_ret} -ne 0 ] && err 1 "${N1_COLOR}${CBSD_APP}unable to create jail: ${N2_COLOR}jcreate jname="${_md5}" host_hostname=${_md5}.my.domain${N0_COLOR}"
+					_rootfs="${workdir}/jails-data/${_md5}-data"
+					[ ! -d "${_rootfs}" ] && err 1 "${N1_COLOR}${CBSD_APP}: no data dir for: ${_md5}: ${N2_COLOR}${_rootfs}${N0_COLOR}"
+					junregister jname="${_md5}"
+					${RM_CMD} -f ${jailrcconfdir}/rc.conf_${_md5}
+					# whats about systemdir stuff?
+					${RM_CMD} -rf ${jailsysdir}/${_md5}
+					# create_from_srcsnap loop
+					. ${subrdir}/zfs.subr
+					DATA=$( ${ZFS_CMD} get -Ho value name ${jaildatadir} )
+					${RSYNC_CMD} -z -a --hard-links --links --acls --xattrs --numeric-ids --recursive --partial ${_imgpath}/ ${_rootfs}/
+					_zfssrc="${DATA}/${_md5}"
+					_zfssrc_snap=$( get_zfs_image_snap ${_zfssrc} )
+					# with ZFS we dont need image file anymore
+					[ ${_remove_source} -eq 1 ] && ${RM_CMD} -f ${path}
+					_size=$( ${ZFS_CMD} get -Hp -o value used ${_zfssrc} 2>/dev/null )
+					source="${path}"
+				else
+					# non-ZFS
+					_rootfs="${workdir}/basejail/${_md5}"
+					[ ! -d "${_rootfs}" ] && ${MKDIR_CMD} -p ${_rootfs}
+					${RSYNC_CMD} -z -a --hard-links --links --acls --xattrs --numeric-ids --recursive --partial ${_imgpath}/ ${_rootfs}/
+					sync
+					source="${path}"
+					register_base ver=empty basename="${_md5}" source="${source}" platform="${platform}"
+					_res=$( ${DU_CMD} -sk ${workdir}/basejail/${_md5} | ${AWK_CMD} '{printf $1"k"}' )
+					if is_number ${_res}; then
+						if conv2bytes ${_res}; then
+							_size="${convval}"
+						else
+							_size="0"
+						fi
+					else
+						_size="0"
+					fi
+				fi
+
+				${BUILDAH_CMD} --root ${workdir}/basejail/buildah unmount ${_md5}
+				${BUILDAH_CMD} --root ${workdir}/basejail/buildah rm ${_md5}
+				${BUILDAH_CMD} --root ${workdir}/basejail/buildah rmi ${_imgname}
+
+				[ -z "${emulator}" ] && emulator="jail"
+				[ -z "${name}" ] && name="${path}"
+				[ -z "${source}" ] && source="unknown"
+
+				cbsdsqlrw images "INSERT INTO images ( md5,name,path,source,emulator,size ) VALUES ( '${_md5}', '${name}', '${workdir}/basejail/${_md5}', '${source}', '${emulator}', '${_size}' )"
+				stderr 0 "${N1_COLOR}registered: ${N2_COLOR}${_md5}${N0_COLOR}"
+			fi
 		fi
-		[ ! -r "${path}" ] && stderr 1 "${N1_COLOR}${CBSD_APP} error: file not found ${N2_COLOR}${path}${N0_COLOR}"
+		[ ! -r "${path}" ] && stderr 1 "${N1_COLOR}${CBSD_APP} error: resource not found ${N2_COLOR}${path}${N0_COLOR}"
 		path=$( ${REALPATH_CMD} ${path} )
 
 		if [ -z "${name}" ]; then
@@ -136,7 +278,7 @@ images_register()
 	[ -z "${source}" ] && source="${path}"
 	_md5=$( ${miscdir}/cbsd_md5 "${source}" )
 
-	_res=$( cbsdsqlro images "SELECT source FROM images WHERE md5=\"${_md5}\"" 2>/dev/null )
+	_res=$( cbsdsqlro images "SELECT source FROM images WHERE md5='${_md5}'" 2>/dev/null )
 	[ -n "${_res}" ] && stderr 1 "${N1_COLOR}${CBSD_APP} error: ${N2_COLOR}${_md5}${N1_COLOR} already exist: source: ${N2_COLOR}${source}${N0_COLOR}"
 
 	# detect image emulator
@@ -153,6 +295,8 @@ images_register()
 	# import jail
 	if [ ${zfsfeat} -eq 1 ]; then
 		jimport jname=${path} new_jname=${_md5} host_hostname=${_md5}.my.domain
+		_ret=$?
+		[ ${_ret} -ne 0 ] && err 1 "${N1_COLOR}${CBSD_APP}unable to import image: ${N2_COLOR}jimport jname=${path} new_jname=${_md5} host_hostname=${_md5}.my.domain${N0_COLOR}"
 		junregister jname=${_md5}
 		${RM_CMD} -f ${jailrcconfdir}/rc.conf_${_md5}
 		# whats about systemdir stuff?
@@ -164,32 +308,55 @@ images_register()
 		_zfssrc="${DATA}/${_md5}"
 		_zfssrc_snap=$( get_zfs_image_snap ${_zfssrc} )
 
-#		if [ -n "${_zfssrc_snap}" ]; then
-#			. ${temprcconf}
-#			echo "Create from snapshot..."
-#			jcreate jname="${jname}" zfs_snapsrc="${_zfssrc_snap}"
-#			jail_created=1
-#		fi
 		# with ZFS we dont need image file anymore
 		[ ${_remove_source} -eq 1 ] && ${RM_CMD} -f ${path}
+		_size=$( ${ZFS_CMD} get -Hp -o value used ${_zfssrc} 2>/dev/null )
 	else
-		err 1 "${CBSD_APP} for ZFS only"
+		jimport jname=${path} new_jname=${_md5} host_hostname=${_md5}.my.domain
+		_ret=$?
+		[ ${_ret} -ne 0 ] && err 1 "${N1_COLOR}${CBSD_APP}: unable to import image: ${N2_COLOR}jimport jname=${path} new_jname=${_md5} host_hostname=${_md5}.my.domain${N0_COLOR}"
+		if [ ! -d "${workdir}/jails-data/${_md5}-data" ]; then
+			${ECHO} "${N1_COLOR}${CBSD_APP}: no data dir: ${N2_COLOR}${workdir}/jails-data/${_md5}-data${N0_COLOR}"
+			jremove jname=${_md5} || true
+			exit 1
+		fi
+		junregister jname=${_md5}
+		${RM_CMD} -f ${jailrcconfdir}/rc.conf_${_md5}
+		# whats about systemdir stuff?
+		${RM_CMD} -rf ${jailsysdir}/${_md5}
+		[ ! -d "${workdir}/basejail/${_md5}" ] && ${MKDIR_CMD} -p "${workdir}/basejail/${_md5}"
+		[ ! -d "${workdir}/basejail/${_md5}" ] && err 1 "${N1_COLOR}${CBSD_APP}: unable to create basejail dir: ${workdir}/basejail/${_md5}${N0_COLOR}"
+		${ECHO} "${N1_COLOR}${CBSD_APP}: convert image ${_md5} data as basedir: ${N2_COLOR}${workdir}/basejail/${_md5}${N0_COLOR}"
+		${RSYNC_CMD} -a --hard-links --links --acls --xattrs --numeric-ids --recursive --partial --delete ${workdir}/jails-data/${_md5}-data/ ${workdir}/basejail/${_md5}/
+		${CHFLAGS_CMD} noschg ${workdir}/jails-data/${_md5}-data
+		${RM_CMD} -rf noschg ${workdir}/jails-data/${_md5}-data ${workdir}/jails-fstab/${_md5}
+		source="${path}"
+		register_base ver=empty basename="${_md5}" source="${source}"
+		_res=$( ${DU_CMD} -sk ${workdir}/basejail/${_md5} | ${AWK_CMD} '{printf $1"k"}' )
+		if is_number ${_res}; then
+			if conv2bytes ${_res}; then
+				_size="${convval}"
+			else
+				_size="0"
+			fi
+		else
+			_size="0"
+		fi
+		path="${workdir}/basejail/${_md5}"
+		[ -z "${name}" ] && name="${path}"
 	fi
 
-	#_size=$( ${STAT_CMD} -f %z ${path} 2>/dev/null )
-	_size=$( ${ZFS_CMD} get -Hp -o value used ${_zfssrc} 2>/dev/null )
-
 	[ -n "${opath}" ] && path="${opath}"
-	cbsdsqlrw images "INSERT INTO images ( md5,name,path,source,emulator,size ) VALUES ( \"${_md5}\", \"${name}\", \"${path}\", \"${source}\", \"${emulator}\", \"${_size}\" )"
+	cbsdsqlrw images "INSERT INTO images ( md5,name,path,source,emulator,size ) VALUES ( '${_md5}', '${name}', '${path}', '${source}', '${emulator}', '${_size}' )"
 	stderr 0 "${N1_COLOR}registered: ${N2_COLOR}${_md5}${N0_COLOR}"
 }
 
 images_delete()
 {
-	local _res _jaildatadir _data _zfssrc _zfssrc_snap _ret
-	local _data _data_root _jaildatadir_root
+	local _res= _jaildatadir= _data= _zfssrc= _zfssrc_snap= _ret=
+	local _data= _data_root= _jaildatadir_root=
 
-	_res=$( cbsdsqlro images "SELECT source FROM images WHERE md5=\"${md5}\"" 2>/dev/null )
+	_res=$( cbsdsqlro images "SELECT md5 FROM images WHERE md5='${md5}'" 2>/dev/null )
 	[ -z "${_res}" ] && stderr 1 "${N1_COLOR}${CBSD_APP} error: not exist in DB: ${N2_COLOR}${md5}${N0_COLOR}"
 
 	# try to remove ZFS first
@@ -222,11 +389,18 @@ images_delete()
 		else
 			${ECHO} "${N1_COLOR}${CBSD_APP}: dataset not exist: ${N2_COLOR}${ZFS_CMD} get -Ho value name ${_jaildatadir}${N0_COLOR}" 1>&2
 		fi
+	else
+		if [ ! -d "${workdir}/basejail/${md5}" ]; then
+			${ECHO} "${N1_COLOR}${CBSD_APP}: no such directory: ${N2_COLOR}${workdir}/basejail/${md5}${N0_COLOR}"
+		else
+			${CHFLAGS_CMD} noschg ${workdir}/basejail/${md5}
+			${RM_CMD} -rf ${workdir}/basejail/${md5}
+		fi
+		unregister_base ver=empty basename="${md5}" arch='*' target_arch='*' ver='*'
 	fi
 
 	[ -d "${_jaildatadir}" ] && ${RMDIR_CMD} ${_jaildatadir}
-
-	cbsdsqlrw images "DELETE FROM images WHERE md5=\"${md5}\""
+	cbsdsqlrw images "DELETE FROM images WHERE md5='${md5}'"
 	stderr 0 "${N1_COLOR}removed: ${N2_COLOR}${md5}${N0_COLOR}"
 }
 
@@ -241,7 +415,7 @@ case "${mode}" in
 		images_delete
 		;;
 	list)
-		[ -z "${display}" ] && display="md5,name,path,source,emulator,size,created"
+		[ -z "${display}" ] && display="md5,name,path,source,emulator,size"
 		[ -z "${header}" ] && header="1"
 		if [ -n "${jname}" ]; then
 			images-list header="${header}" display="${display}" jname="${jname}"

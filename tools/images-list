@@ -15,7 +15,7 @@ display= list by comma for column. Default: display=md5,name,path,source,emulato
 . ${cbsdinit}
 . ${subrdir}/bhyve.subr
 . ${subrdir}/virtual.subr
-[ -z "${display}" ] && display="md5,name,path,source,emulator,size,created"
+[ -z "${display}" ] && display="md5,name,path,source,emulator,size"
 
 #remove commas for loop action on header
 mydisplay=$( echo ${display} | ${TR_CMD} ',' '  ' )
@@ -42,24 +42,6 @@ populate_output_data()
 		eval _val=\$$_i
 		[ -z "${_val}" ] && _val="-"
 
-		if [ "${_i}" = "dsk_size" ]; then
-			if [ "${_val}" = "0" ]; then
-				# no size in table? retrieve and update it
-				populate_dsk_size
-				_val="${dsk_size}"			# already in human
-				# update values in table
-				cbsdsqlrw ${jailsysdir}/${jname}/local.sqlite UPDATE bhyvedsk SET dsk_size=\"${dsk_bsize}\" WHERE dsk_path=\"${dsk_path}\"
-			else
-				# convert ${dsk_bsize} for human
-				if conv2human "${dsk_bsize}"; then
-					_val=${convval}
-				else
-					populate_dsk_size
-					_val="${dsk_size}"
-				fi
-			fi
-		fi
-
 		if [ -z "${_status}" ]; then
 			_status="${N0_COLOR}${_val}"
 		else
@@ -84,10 +66,10 @@ show_jaildata_from_sql()
 	fi
 
 	_status=
-	_sql="SELECT md5,name,path,source,emulator,size,created FROM images"
+	_sql="SELECT md5,name,path,source,emulator,size FROM images"
 
-	cbsdsqlro ${sqlfile} ${_sql} | while read md5 name path source emulator size created; do
-		created=$( echo ${created} | ${TR_CMD} " " "_" )
+	cbsdsqlro ${sqlfile} ${_sql} | while read md5 name path source emulator size; do
+		#created=$( echo ${created} | ${TR_CMD} " " "_" )
 
 		if ! is_number ${size}; then
 			if conv2human "${size}"; then

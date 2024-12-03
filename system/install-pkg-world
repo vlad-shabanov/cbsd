@@ -7,7 +7,8 @@ MYDESC="Install base-in-package FreeBSD base"
 ADDHELP="
 ${H3_COLOR}Description${N0_COLOR}:
 
-Install FreeBSD base from PKG (base-in-packages)
+Install base/rootfs from pkg (base-in-packages) and register it and CBSD DB.
+When destdir= used, registration in the CBSD DB will be skipped.
 
 ${H3_COLOR}Options${N0_COLOR}:
 
@@ -35,6 +36,7 @@ ${H3_COLOR}See also${N0_COLOR}:
 
   cbsd buildworld --help
   cbsd bases --help
+  cbsd register_base --help
   cbsd world --help
   cbsd repo --help
 
@@ -76,7 +78,6 @@ if [ -n "${register_basename}" ]; then
 else
 	init_basedir
 fi
-
 
 #[ -x "${BASE_DIR}/bin/sh" ] &&  err 1 "${N1_COLOR}${CBSD_APP}: not empty, base already exist: ${N2_COLOR}${BASE_DIR}${N0_COLOR}"
 
@@ -266,7 +267,7 @@ baseelf=
 baseelf=$( ${miscdir}/elf_tables --ver ${BASE_DIR}/bin/sh 2>/dev/null )
 
 [ -z "${baseelf}" ] && baseelf="0"
-register_base arch=${arch} ver=${ver} target_arch="${target_arch}" source="install-pkg-world" auto_baseupdate=0 ${_basename_args}
+[ -z "${destdir}" ] && register_base arch=${arch} ver=${ver} target_arch="${target_arch}" source="install-pkg-world" auto_baseupdate=0 ${_basename_args}
 
 ${RM_CMD} -f ${BASE_DIR_LOCKFILE}
 

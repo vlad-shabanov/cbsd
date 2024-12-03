@@ -1,45 +1,70 @@
 #!/usr/local/bin/cbsd
 #v11.1.16
-MYARG="arch ver stable"
-MYOPTARG="platform target_arch basename"
-MYDESC="Unregister bases (without removing from storage) for jails in the databases"
-CBSDMODULE="build"
+MYARG="ver"
+MYOPTARG="arch platform target_arch basename"
+MYDESC="Unregister bases (without removing from storage) for jails from the CBSD DB"
+CBSDMODULE="jail,sys"
+ADDHELP="
 
-. ${subrdir}/nc.subr
+${H3_COLOR}Description${N0_COLOR}:
+
+Register basedir for jails in CBSD CB
+
+${H3_COLOR}Options${N0_COLOR}:
+
+ ${N2_COLOR}basename${N0_COLOR}       - <path> - alternative DESTDIR= path instead of ~cbsd/basejail/;
+
+${H3_COLOR}Examples${N0_COLOR}:
+
+ # cbsd unregister_base ver=empty basename="ca10502801e3b89a4d4f94f3a4dcc0d7" platform='*' arch='*' target_arch='*'
+
+${H3_COLOR}See also${N0_COLOR}:
+
+  cbsd register_base --help
+  cbsd bases --help
+
+"
+
+obasename=
 basename=
+arch=
+oarch=
 platform=
 oplatform=
+ver=
+over=
 . ${cbsdinit}
 
+[ -z "${arch}" ] && arch=$( ${UNAME_CMD} -m )
+[ -n "${basename}" ] && obasename="${basename}"
+. ${tools}
+. ${strings}
+. ${system}
+
+[ -n "${oarch}" ] && arch="${oarch}"
+[ -n "${over}" ] && ver="${over}"
+[ -z "${target_arch}" ] && target_arch="${arch}"
 [ -n "${platform}" ] && oplatform="${platform}"
 [ -z "${target_arch}" ] && target_arch="${arch}"
 
-if [ -z "${stable}" ]; then
-	strpos --str="${ver}" --search="."
-	# auto-detect for stable/release
-	pos=$?
-	if [ ${pos} -eq 0 ]; then
-		stable=1
-	else
-		stable=0
-	fi
-fi
-
 . ${subrdir}/universe.subr
 
-if [ -n "${basename}" ]; then
-	_basename_args="-b ${basename}"
-else
-	_basename_args=
-fi
+_get_idx_str="get_baseidx -s *"
+[ -n "${arch}" ] && _get_idx_str="${_get_idx_str} -a ${arch}"
+[ -n "${target_arch}" ] && _get_idx_str="${_get_idx_str} -t ${target_arch}"
+[ -n "${platform}" ] && _get_idx_str="${_get_idx_str} -p ${platform}"
+[ -n "${basename}" ] && _get_idx_str="${_get_idx_str} -b ${basename}"
+[ -n "${ver}" ] && _get_idx_str="${_get_idx_str} -v ${ver}"
 
-idx=$( get_baseidx -a ${arch} -p ${platform} -s ${stable} -t ${target_arch} -v ${ver} ${_basename_args} -p ${platform} )
+idx=$( ${_get_idx_str} )
 
-if [ -n "${idx}" ]; then
-	cbsdsqlrw local "DELETE FROM bsdbase WHERE idx=\"${idx}\""
-	err 0 "${N1_COLOR}Unregistered${N0_COLOR}"
-else
-	err 1 "${N1_COLOR}unregister_base: No idx for platform:${platform}, arch:${arch}, target_arch:${target_arch}, ver:${ver}, stable:${stable}, basename:${basename}${N0_COLOR}"
-fi
+for i in ${idx}; do
+	if [ -n "${i}" ]; then
+		cbsdsqlrw local "DELETE FROM bsdbase WHERE idx='${i}'"
+		${ECHO} "${N1_COLOR}Unregistered base${N0_COLOR}"
+	else
+		${ECHO} "${N1_COLOR}unregister_base: No idx for platform:${platform}, arch:${arch}, target_arch:${target_arch}, ver:${ver}, stable:${stable}, basename:${basename}${N0_COLOR}"
+	fi
+done
 
 exit 0

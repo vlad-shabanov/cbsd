@@ -68,8 +68,8 @@ init_srcdir()
 # -v: set alternative ver ( same is $ver variable )
 init_basedir()
 {
-	local _basename
-	local _arch _ver _sver _idx _oarch _over
+	local _basename=
+	local _arch= _ver= _sver= _idx= _oarch= _over=
 
 	while getopts "a:b:v:" opt; do
 		case "${opt}" in
@@ -99,13 +99,17 @@ init_basedir()
 		BASE_DIR="${basejaildir}/${basejailpref}_${_oarch}_${target_arch}_${_over}"
 	else
 		_sver=${_over%%.*}
-		_idx=$( cbsdsqlro ${dbdir}/local.sqlite SELECT idx FROM bsdbase WHERE basename=\"${_basename}\" AND \( ver=\"${_over}\" OR ver=\"${_sver}\" \) AND arch=\"${_oarch}\" 2>/dev/null )
+		_idx=$( cbsdsqlro ${dbdir}/local.sqlite "SELECT idx FROM bsdbase WHERE basename='${_basename}' AND \( ver='${_over}' OR ver='${_sver}' \) AND arch='${_oarch}'" 2>/dev/null )
 		# base with custom basename may registered with stable/unstable $ver - get this version to determine correct base path
-		if [ -n "${_idx}" ]; then
-			_ver=$( cbsdsqlro ${dbdir}/local.sqlite SELECT ver FROM bsdbase WHERE idx="${_idx}" 2>/dev/null )
-			BASE_DIR="${basejaildir}/${basejailpref}_${_basename}_${_oarch}_${target_arch}_${_ver}"
+		if [ -d "${basejaildir}/${_basename}" ]; then
+			BASE_DIR="${basejaildir}/${_basename}"
 		else
-			BASE_DIR="${basejaildir}/${basejailpref}_${_basename}_${_oarch}_${target_arch}_${_over}"
+			if [ -n "${_idx}" ]; then
+				_ver=$( cbsdsqlro ${dbdir}/local.sqlite "SELECT ver FROM bsdbase WHERE idx='${_idx}'" 2>/dev/null )
+				BASE_DIR="${basejaildir}/${basejailpref}_${_basename}_${_oarch}_${target_arch}_${_ver}"
+			else
+				BASE_DIR="${basejaildir}/${basejailpref}_${_basename}_${_oarch}_${target_arch}_${_over}"
+			fi
 		fi
 	fi
 
@@ -315,12 +319,13 @@ init_make_flags()
 # args, e.g: -a amd64 -p FreeBSD -s 0 -t amd64 -v 12 [-b basename]
 get_baseidx()
 {
-	local arch platform stable target_arch ver idx basename
+	local arch= platform= stable= target_arch= ver= idx= basename=
+	local _sqlq= _multiq=0 _T=
 
 	while getopts "a:b:p:s:t:v:" opt; do
 		case "${opt}" in
 			a) arch="${OPTARG}" ;;
-			a) basename="${OPTARG}" ;;
+			b) basename="${OPTARG}" ;;
 			p) platform="${OPTARG}" ;;
 			s) stable="${OPTARG}" ;;
 			t) target_arch="${OPTARG}" ;;
@@ -329,8 +334,27 @@ get_baseidx()
 		shift $(($OPTIND - 1))
 	done
 
+	_sqlq="SELECT idx FROM bsdbase"
+
+	for _i in arch basename platform stable target_arch ver; do
+		_T=
+		eval _T="\$$_i"
+		[ -z "${_T}" ] && continue
+		echo "${_i} = [${_T}]" >> /tmp/x
+		if [ "${_T}" != "*" ]; then
+			if [ ${_multiq} -eq 0 ]; then
+				_sqlq="${_sqlq} WHERE ${_i}='${_T}'"
+				_multiq=1
+			else
+				_sqlq="${_sqlq} AND ${_i}='${_T}'"
+			fi
+		fi
+	done
+
+	#echo "Q: [${_sqlq}]" >> /tmp/x
+
 	[ -z "${basename}" ] && basename="0"
-	idx=$( cbsdsqlro local "SELECT idx FROM bsdbase WHERE platform='${platform}' AND arch='${arch}' AND targetarch='${target_arch}' AND ver='${ver}' AND stable='${stable}' AND basename='${basename}'" 2>/dev/null )
+	idx=$( cbsdsqlro local "${_sqlq}" 2>/dev/null | ${XARGS_CMD} )
 	echo "${idx}"
 }
 

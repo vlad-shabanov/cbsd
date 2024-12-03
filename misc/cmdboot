@@ -126,6 +126,7 @@ OPTIONAL_CMD="\
 acpidump \
 bhyvectl \
 bhyve \
+buildah \
 git \
 jail \
 pfctl \
