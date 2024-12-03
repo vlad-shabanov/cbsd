@@ -79,6 +79,19 @@ etc/defaults/vm-openbsd-cloud-openbsd-x86-74.conf
 etc/defaults/vm-linux-fedora-server-39-x86_64.conf
 etc/defaults/vm-linux-cloud-Fedora-37-x86_64.conf
 etc/defaults/vm-linux-cloud-Fedora-38-x86_64.conf
+etc/defaults/vm-freebsd-FreeBSD-aarch64-14.1.conf
+etc/defaults/vm-freebsd-FreeBSD-img-aarch64-13.3.conf
+etc/defaults/vm-freebsd-FreeBSD-img-arm64-13.3.conf
+etc/defaults/vm-freebsd-FreeBSD-riscv64-14.1.conf
+etc/defaults/vm-freebsd-pfSense-2-RELEASE-amd64.conf
+etc/defaults/vm-linux-Android-x86.conf
+etc/defaults/vm-linux-BlackBox-8-x86_64.conf
+etc/defaults/vm-linux-CentOS-7-x86_64.conf
+etc/defaults/vm-linux-kubuntu-desktop-amd64-23.conf
+etc/defaults/vm-linux-ubuntuserver-amd64-23.conf
+etc/defaults/vm-other-omnios-2023.conf
+etc/defaults/vm-linux-cloud-CentOS-stream-8-x86_64.conf
+etc/defaults/vm-linux-cloud-Rocky-8-x86_64.conf
 "
 
 OLD_DIRS="\
