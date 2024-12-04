@@ -19,7 +19,7 @@ default_sysctls = [
   "net.ipv4.ping_group_range=0 0",
 ]
 ```
-- The official FreeBSD Handbook describes classic jail as `FreeBSD basejail` mounted as RO (nullfs) and overlay data mounted in RW (nullfs). 
+- The official **FreeBSD Handbook** [describes](https://docs.freebsd.org/en/books/handbook/jails/) classic jail as `FreeBSD base` mounted as RO (nullfs) and overlay data mounted in RW (nullfs). 
   This is a fundamental difference in the approach to using images, and when someone says "FreeBSD jail managers is obsolete", this approach is meant. 
   However, it is a relevant approach for freeBSD. Moreover, nothing prevents you from using it in OSI images oriented for FreeBSD - CBSD allows it.
 
@@ -74,4 +74,9 @@ BUG_REPORT_URL="https://gitlab.alpinelinux.org/alpine/aports/-/issues"
 - CBSD uses `buildah` tool only to get an image (or generate and push a jail container to the Docker registry);
 - At the moment CBSD ignores OCI image `Entrypoints` - work is underway on integration with CBSD daemonize;
 - CBSD uses a `buildah` with alternative paths (to store data in the CBSD hier/structure). If you have difficulties with the build, call it with arguments, which you will see in the output
+- On ZFS and non-ZFS system, images are stored in different places. With ZFS, the CBSD uses a snapshot and works as a `zfs_snapsrc` parameter when creating a container. If the ZFS is absent, 
+  the image is located in the ~cbsd/basejail/ directory and the container is created by copying files (which, of course, is much slower compared to CoW).
+  Images on a non-ZFS system are also visible as 'cbsd bases: 
+  
 
+![cbsd-oci1.png](https://convectix.com/img/cbsd-oci2.png)
