@@ -15,7 +15,8 @@ Exploring the CBSD virtual environment management framework](https://eerielinux.
 - [Broker driven CBSD cluster (example)](general/)
 - [CBSD integration with PHPIPAM (IP management)](general/wf_ipam.md)
 - [API module: private cloud via API](general/cbsd_api.md)
-- [About fetch work with CBSD (bases,images,VM), CBSD mirrors](general/cbsd_fetch.md)
+- [CBSD and OCI containers](general/cbsd_oci.md)
+- [About fetch work: bases,images,VM mirrors](general/cbsd_fetch.md)
 
 
 <!---

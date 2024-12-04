@@ -1,4 +1,4 @@
-# About fetch work with CBSD (bases,images,VM), CBSD mirrors
+# About fetch work: bases,images,VM mirrors
 
 ## Description
 
@@ -13,8 +13,8 @@ The CRC amounts are also accompanied by the **CBSD** project participants and ar
 
 As the information on the Internet is in constant dynamic motion, some resources have properties that become obsolete or disappear through the old links, and this happens very often.
 
-The **CBSD** project in most cases tries to protect users from such changes - for this we have launched the official mirror for **CBSD resources**, and we very much welcome any help with resources and maintenance
-project on the part of users. You can read about this in the _"Expand Resource Mirror **CBSD**"_ section below.
+The **CBSD** project has its own infrastructure (mainly thanks to donors) to protect users from such changes - for this we have launched the official mirror for **CBSD resources**, 
+and we very much welcome any help with resources and maintenance project on the part of users. You can read about this in the _"Expand Resource Mirror **CBSD**"_ section below.
 
 # fetch.conf
 
