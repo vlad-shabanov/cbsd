@@ -8,7 +8,7 @@ There is a misconception that with the advent of OCI all container managers on F
 There are a few points to note here:
 
 - OCI is an image standard, it does not regulate how exactly to work with the image;
-- for 2025y, OCI takes into account and focuses on the capabilities of Linux systems and in particular, the use of groups/FS layers/namespaces. Thus, many things (capabilities, plugins) on FreeBSD marked as: "not supported yet". 
+- for 2025y, OCI takes into account and focuses on the capabilities of Linux systems and in particular, the use of cgroups/FS layers/namespaces. Thus, many things (capabilities, plugins) on FreeBSD marked as: "not supported yet". 
 As an example - namespaces. For example, in OCI, containers may have 'sysctl' parameters which is widely used - FreeBSD will not allow you to do this:
 ```
 # A list of sysctls to be set in containers by default,
