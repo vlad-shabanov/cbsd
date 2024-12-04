@@ -8,8 +8,9 @@ There is a misconception that with the advent of OCI all container managers on F
 There are a few points to note here:
 
 - OCI is an image standard, it does not regulate how exactly to work with the image;
-- for 2025y, OCI takes into account and focuses on the capabilities of Linux systems and in particular, the use of cgroups/FS layers/namespaces. Thus, many things (capabilities, plugins) on FreeBSD marked as: "not supported yet". 
-As an example - namespaces. For example, in OCI, containers may have 'sysctl' parameters which is widely used - FreeBSD will not allow you to do this:
+- As of 2025, OCI takes into account and focuses on the capabilities of Linux systems and in particular, the use of cgroups/FS layers/namespaces. Thus, many things (capabilities, plugins) on FreeBSD marked as: "not supported yet". 
+As an example - namespaces. For example, in OCI, containers may have 'sysctl' parameters which is widely used (e.g. in redis or postgresql containers). 
+However, FreeBSD won't let you use this because it doesn't have such capabilities.
 ```
 # A list of sysctls to be set in containers by default,
 # specified as "name=value",
@@ -21,7 +22,7 @@ default_sysctls = [
 ```
 - The official **FreeBSD Handbook** [describes](https://docs.freebsd.org/en/books/handbook/jails/) classic jail as `FreeBSD base` mounted as RO (nullfs) and overlay data mounted in RW (nullfs). 
   This is a fundamental difference in the approach to using images, and when someone says "FreeBSD jail managers is obsolete", this approach is meant. 
-  However, it is a relevant approach for freeBSD. Moreover, nothing prevents you from using it in OSI images oriented for FreeBSD - CBSD allows it.
+  However, it is a relevant approach for FreeBSD. Moreover, nothing prevents you from using it in OSI images oriented for FreeBSD - CBSD allows it.
 
 ## How to work with OCI
 
