@@ -22,7 +22,7 @@ default_sysctls = [
 ```
 - The official **FreeBSD Handbook** [describes](https://docs.freebsd.org/en/books/handbook/jails/) classic jail as `FreeBSD base` mounted as RO (nullfs) and overlay data mounted in RW (nullfs). 
   This is a fundamental difference in the approach to using images, and when someone says "FreeBSD jail managers is obsolete", this approach is meant. 
-  However, it is a relevant approach for FreeBSD. Moreover, nothing prevents you from using it in OSI images oriented for FreeBSD - CBSD allows it.
+  However, it is a relevant approach for FreeBSD. Moreover, nothing prevents you from using it in OCI images oriented for FreeBSD, at least CBSD allows it (and you save about ~500 megabytes in the case of a full FreeBSD base distribution)
 
 ## How to work with OCI
 
