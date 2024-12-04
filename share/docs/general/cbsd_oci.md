@@ -22,7 +22,7 @@ default_sysctls = [
 ```
 - The official **FreeBSD Handbook** [describes](https://docs.freebsd.org/en/books/handbook/jails/) classic jail as `FreeBSD base` mounted as RO (nullfs) and overlay data mounted in RW (nullfs). 
   This is a fundamental difference in the approach to using images, and when someone says "FreeBSD jail managers is obsolete", this approach is meant. 
-  However, it is a relevant approach for FreeBSD. Moreover, nothing prevents you from using it in OCI images oriented for FreeBSD, at least CBSD allows it (and you save about ~500 megabytes in the case of a full FreeBSD base distribution)
+  However, it is a relevant approach for FreeBSD. Moreover, nothing prevents you from using it in OCI images oriented for FreeBSD, at least CBSD allows it (and you save about ~500 megabytes in the case of a full FreeBSD base distribution and gives you a full set of debugging utilities "for free" inside jails).
 
 ## How to work with OCI
 
@@ -74,7 +74,7 @@ BUG_REPORT_URL="https://gitlab.alpinelinux.org/alpine/aports/-/issues"
 - Support for `buildah/OCI` is experimental (Also `buildah` package is marked as experimental by itself) - do not use it in production;
 - CBSD uses `buildah` tool only to get an image (or generate and push a jail container to the Docker registry);
 - At the moment CBSD ignores OCI image `Entrypoints` - work is underway on integration with CBSD daemonize;
-- CBSD uses a `buildah` with alternative paths (to store data in the CBSD hier/structure). If you have difficulties with the build, call it with arguments, which you will see in the output
+- CBSD uses a `buildah` with alternative paths (to store data in the CBSD hier/structure). If you have difficulties with the `buildah` images via CBSD, call it with the appropriate arguments (check out `cbsd buildah` output).
 - On ZFS and non-ZFS system, images are stored in different places. With ZFS, the CBSD uses a snapshot and works as a `zfs_snapsrc` parameter when creating a container. If the ZFS is absent, 
   the image is located in the ~cbsd/basejail/ directory and the container is created by copying files (which, of course, is much slower compared to CoW).
   Images on a non-ZFS system are also visible as 'cbsd bases: 
