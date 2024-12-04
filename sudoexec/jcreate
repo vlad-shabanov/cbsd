@@ -60,6 +60,9 @@ ${H3_COLOR}Options${N0_COLOR}:
  ${N2_COLOR}inter=${N0_COLOR}          - 0 to prevent any questions and to accept answers by default.
  ${N2_COLOR}customskel=${N0_COLOR}     - <path>: additional skel directory applyed above jail structrure.
  ${N2_COLOR}fstablocal=${N0_COLOR}     - <path>: additional fstab file stored as fstab.local.
+ ${N2_COLOR}interface=${N0_COLOR}      - <name>:  specify jail interface. Use 'ppt-XX' prefix (+vnet=1) to 
+                   pass XX as vnet interface instead of 'epair', e.g.: 'ppt-em0'.
+                   Warning! the PPT interface will disappear from the host system while the container is running.
  ${N2_COLOR}jprofile=${N0_COLOR}       - <name>:  specify jail profile for creating jail.
  ${N2_COLOR}jnameserver=${N0_COLOR}    - <IP>: override default 'jnameserver' settings for jail.
  ${N2_COLOR}zfs_snapsrc=${N0_COLOR}    - <name>: use ZFS snapshot as data source.
@@ -80,7 +83,7 @@ Additional args when RACCT enabled: ${RCTL} ${RCTL_EXTRA}
 
 ${H3_COLOR}Examples${N0_COLOR}:
 
- # cbsd jcreate jname=test runasap=1 zfs_encryption=1
+ # cbsd jcreate jname=test runasap=1 zfs_encryption=1 interface=ppt-em
  # cbsd jcreate jname=test2 astart=0 pkglist=\"misc/mc net/fping\" ip4_addr=DHCP,DHCPv6 allow_sysvipc=1 allow_raw_sockets=1
  # cbsd jcreate jname=vnet1 runasap=1 ip4_addr=\"10.0.1.5/24\" ci_gw4=\"10.0.1.1\" ci_user_pubkey=\"/root/.ssh/authorized_keys\"
  # cbsd jcreate jname=deb jprofile=debian_bookworm allow_raw_sockets=1
@@ -88,7 +91,8 @@ ${H3_COLOR}Examples${N0_COLOR}:
  # cbsd jcreate jname=rock jprofile=rocky_9 allow_raw_sockets=1
  # cbsd jcreate jname=dev jprofile=devuan_daedalus allow_raw_sockets=1
  # cbsd jcreate jname=riscv pkg_bootstrap=0 arch=riscv emulator=\"qemu-riscv64-static\" exec_start=\"/bin/qemu-riscv64-static /bin/sh /etc/rc\" exec_stop=\"/bin/qemu-riscv64-static /bin/sh /etc/rc.shutdown\"
- # cbsd jcreate jname=xx ver=13.2 vnet=1 sysrc=\"ifconfig_eth0+='mtu 1450' inetd_enable=YES\"
+ # cbsd jcreate jname=nictest vnet=1 interface=ppt-em0
+ # cbsd jcreate jname=xx ver=14.2 vnet=1 sysrc=\"ifconfig_eth0+='mtu 1450' inetd_enable=YES\"
  # cbsd jcreate jname=vmagent from=https://dl.convectix.com/img/amd64/amd64/14.2/vmagent/vmagent.img pkg_bootstrap=0 runasap=1
  # cbsd jcreate jname=myapp from=fbbb4e8707f6794008cc6e8ed0d86082 runasap=1
  # cbsd jcreate jname=small flavor=small1 runasap=1 jnameserver="8.8.8.8,8.8.4.4"
@@ -786,8 +790,8 @@ else
 	[ ! -r ${jailsysdir}/${jname}/local.sqlite ] && /usr/local/bin/cbsd ${miscdir}/updatesql ${jailsysdir}/${jname}/local.sqlite ${distdir}/share/local-jailnic.schema jailnic
 	# create default record
 
-	tmp_type=${interface%%#*}		# cut all after '#'
-	tmp_iface=${interface##*#}		# cut all before '#'
+	tmp_type=${interface%%-*}		# cut all after '#'
+	tmp_iface=${interface##*-}		# cut all before '#'
 
 	case "${tmp_type}" in
 		ppt|epair|ovs)

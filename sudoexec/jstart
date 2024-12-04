@@ -543,9 +543,17 @@ if [ "${vnet}" = "1" ]; then
 	printf "${N1_COLOR}create epair: "
 
 	for i in ${interfaces}; do
+		nic_hwaddr=
+		nic_parent=
+		nic_address=
+		nic_type=
+		_A=
+		_A=$( cbsdsqlro ${jailsysdir}/${jname}/local.sqlite "SELECT nic_parent,nic_address,nic_hwaddr FROM jailnic WHERE name='${i}'" )
 
-		tmp_type=${i%%#*}		# cut all after '#'
-		tmp_iface=${i##*#}		# cut all before '#'
+		sqllist "${_A}" nic_parent nic_address nic_hwaddr
+
+		tmp_type=${nic_parent%%-*}		# cut all before '#'
+		tmp_iface=${nic_parent##*-}		# cut all after '#'
 
 		case "${tmp_type}" in
 			ppt|epair|ovs)
@@ -554,29 +562,10 @@ if [ "${vnet}" = "1" ]; then
 				;;
 			*)
 				nic_type="epair"		# epair by default
-				true
-				;;
-		esac
-
-		case "${tmp_iface}" in
-			ppt_*)
-				nic_type="ppt"
-				;;
-			*)
-				nic_type="epair"
 				;;
 		esac
 
 		unset tmp_type tmp_type
-		#echo "NIC TYPE [$i]: ${nic_type}"
-
-		nic_hwaddr=
-		nic_parent=
-		nic_address=
-		_A=
-		_A=$( cbsdsqlro ${jailsysdir}/${jname}/local.sqlite "SELECT nic_parent,nic_address,nic_hwaddr FROM jailnic WHERE name='${i}'" )
-		sqllist "${_A}" nic_parent nic_address nic_hwaddr
-		#nic_parent=$( cbsdsqlro ${jailsysdir}/${jname}/local.sqlite "SELECT nic_parent FROM jailnic WHERE name='${i}'" )
 
 		# when ip=0 and interface=auto we must use default interface for upstream
 		[ "${nic_parent}" = "0" -o "${nic_parent}" = "auto" ] && nic_parent=$( getnics-by-ip ip=0.0.0.0 skip=bridge )
@@ -606,11 +595,17 @@ if [ "${vnet}" = "1" ]; then
 			cbsdvale*)
 				mybridge="${nic_parent}"
 				;;
+			ppt-*)
+				mybridge=
+				true
+				;;
 			*)
 				if ! mybridge=$( get_my_device bridge ${nic_parent} ); then
 					err 1 "${N1_COLOR}Error: Cant get_my_device for ${nic_parent}: ${mybridge}${N0_COLOR}"
 				fi
 		esac
+
+		echo "NT: ${nic_type}"
 
 		if [ "${nic_type}" = "ppt" ]; then
 			myepair="${i}"
