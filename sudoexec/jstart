@@ -559,15 +559,16 @@ if [ "${vnet}" = "1" ]; then
 		esac
 
 		case "${tmp_iface}" in
-			epair*)
-				nic_type="epair"
+			ppt_*)
+				nic_type="ppt"
 				;;
 			*)
-				nic_type="ppt"
+				nic_type="epair"
 				;;
 		esac
 
 		unset tmp_type tmp_type
+		#echo "NIC TYPE [$i]: ${nic_type}"
 
 		nic_hwaddr=
 		nic_parent=
@@ -651,7 +652,7 @@ if [ "${vnet}" = "1" ]; then
 				${distdir}/tools/vale-ctl -h vale${valeid}:${myepair}a
 		esac
 
-		printf "${H3_COLOR}${myepair}:${N2_COLOR}${nic_parent} "
+		printf "${H3_COLOR}${myepair}(type:${nic_type}):${N2_COLOR}${nic_parent} "
 
 		case "${nic_type}" in
 			ppt)
@@ -683,6 +684,8 @@ if [ "${vnet}" = "1" ]; then
 			cbsdsqlrw ${jailsysdir}/${jname}/local.sqlite "UPDATE jailnic SET nic_hwaddr='${nic_hwaddr}' WHERE name='${i}'"
 		fi
 
+		_iface_rename=0
+
 		case "${nic_type}" in
 			ppt)
 				cbsdlogger NOTICE ${CBSD_APP}: jail ${jname}: set hwaddr for vnet interface ${myepair}: ${nic_hwaddr}
@@ -690,6 +693,7 @@ if [ "${vnet}" = "1" ]; then
 				;;
 			*)
 				cbsdlogger NOTICE ${CBSD_APP}: jail ${jname}: set hwaddr for vnet interface ${myepair}b: ${nic_hwaddr}
+				_iface_rename=1
 				${IFCONFIG_CMD} ${myepair}b ether ${nic_hwaddr}
 				if [ "${nic_address}" != "0" ]; then
 					${IFCONFIG_CMD} ${myepair}a inet ${nic_address} up
@@ -928,7 +932,7 @@ if [ ${vnet} -eq 1 ]; then
 		${IFCONFIG_CMD} ${i} up
 		# we need setup lock here due to ethX name possible conflict with other jail
 		_wait_count=0
-		_iface_rename=0
+		[ -z "${_iface_rename}" ] && _iface_rename=0
 
 		if [ ${_iface_rename} -eq 1 ]; then
 			while [ -r ${tmpdir}/eth${eth_seq}.locked ]; do
