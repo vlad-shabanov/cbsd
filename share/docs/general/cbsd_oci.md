@@ -50,7 +50,7 @@ Command 'telnet' not found, but can be installed with:
 pkg install -y FreeBSD-telnet
 ```
 
-Example1: Linux image
+Example1: Linux image (needs 'kldload linux.ko' and 'kldload linux64.ko`)
 
 ```
 cbsd jcreate jname=test2 ver=empty baserw=1 pkg_bootstrap=0 floatresolv=0 applytpl=0 etcupdate_init=0 exec_start=/bin/true exec_stop=/bin/true from=docker.io/library/alpine emulator=linux runasap=1
