@@ -2,9 +2,9 @@
 # shellcheck shell=sh disable=2034,2154,1091
 #v13.0.8
 MYARG="src"
-MYOPTARG="cache_sum clonos imgsize_max json myb show_iso vm_os_type vm_cpus_max vm_ram_max warmed"
+MYOPTARG="cache_sum clonos emulator imgsize_max json myb show_iso vm_os_type vm_cpus_max vm_ram_max warmed"
 MYDESC="list of available profiles for virtual machine"
-CBSDMODULE="bhyve,xen"
+CBSDMODULE="bhyve,jail,xen"
 ADDHELP="
 ${H3_COLOR}Description${N0_COLOR}:
 
@@ -15,7 +15,7 @@ Files have a strictly defined name vm-<vm_os_type>-<name-of-profile>.conf and ar
 located in directories:
 
   - ~cbsd/etc/defaults/  (official/contrib profiles);
-  ~ cbsd/etc/            (custom user's profiles);
+  - ~cbsd/etc/           (custom user's profiles);
 
 You can create virtual machines via API or command line (e.g. 'cbsd bcreate' for bhyve).
 The 'cbsd get-profiles' script will help parse the names of existing profiles and issue 
@@ -27,11 +27,12 @@ cache the output.
 Hint: you may want to override some (_max) parameters ( {imgsize,vm_ram,vm_cpus}_max= )
  in the output, depending on your capabilities. To override globbaly per-host, you can 
  use ~cbsd/etc/get-profiles.conf (sample: ~cbsd/etc/defaults/get-profiles.conf)
- 
+
 ${H3_COLOR}Options${N0_COLOR}:
 
  ${N2_COLOR}cache_sum${N0_COLOR}     - show cache CRC sum for src=XXX only (used to detect when content changes);
  ${N2_COLOR}clonos${N0_COLOR}        - show profiles marked as 'clonos_active=1' only;
+ ${N2_COLOR}emulator${N0_COLOR}      - filter by emulator: 'bhyve', 'xen', 'qemu', 'jail', ...;
  ${N2_COLOR}imgsize_max${N0_COLOR}   - show this values in 'imgsize_max' field, e.g.: '100g'.
                   when empty = inherit hoster datapool size;
  ${N2_COLOR}json${N0_COLOR}          - json output when 'json=1', default: 0;
@@ -52,8 +53,7 @@ ${H3_COLOR}Examples${N0_COLOR}:
  # cbsd get-profiles src=cloud json=1
  # cbsd get-profiles src=cloud json=0 warm=1 vm_os_type=freebsd show_iso=1
  # cbsd get-profiles src=cloud json=0 warm=1 vm_os_type=freebsd myb=1
- # cbsd get-profiles src=jail
- # cbsd get-profiles src=jail cache_sum=1
+ # cbsd get-profiles src=cloud emulator=jail cache_sum=1
 
 ${H3_COLOR}See also${N0_COLOR}:
 
@@ -87,8 +87,11 @@ oimgsize_max=
 ovm_cpus_max=
 cache_sum=0
 ovm_ram=
+emulator=
+oemulator=
 . ${cbsdinit}
 
+[ -n "${emulator}" ] && oemulator="${emulator}"
 [ -n "${vm_cpus_max}" ] && ovm_cpus_max="${vm_cpus_max}"
 [ -n "${vm_ram_max}" ] && ovm_ram_max="${vm_ram_max}"
 [ -n "${vm_ram_min}" ] && ovm_ram_min="${vm_ram_min}"
@@ -136,7 +139,9 @@ get_all_profile_list()
 {
 	local _prefix=
 
-	case ${src} in
+	[ -n "${oemulator}" ] && emulator="${oemulator}"
+
+	case ${emulator} in
 		jail)
 			_prefix="jail-freebsd"
 			;;
@@ -145,13 +150,11 @@ get_all_profile_list()
 			;;
 	esac
 
-
 	if [ -z "${search_vm_os_type}" ]; then
 		${FIND_CMD} ${workdir}/etc/defaults ${workdir}/etc -maxdepth 1 -mindepth 1 -type f -name ${_prefix}\-*\.conf 2>/dev/null
 	else
 		${FIND_CMD} ${workdir}/etc/defaults ${workdir}/etc -mindepth 1 -maxdepth 1 -type f -name ${_prefix}\-${search_vm_os_type}\-*\.conf 2>/dev/null
 	fi
-
 }
 
 get_vm_info()
@@ -235,13 +238,17 @@ get_vm_info()
 	fi
 
 	name="${long_description}"
-	if [ "${src}" = "jail" ]; then
+
+	[ -n "${oemulator}" ] && emulator="${oemulator}"
+
+	if [ "${emulator}" = "jail" ]; then
 		profile="${jail_profile}"
 		type="jail"
 	else
 		profile="${vm_profile}"
 		type="${vm_os_type}"
 	fi
+
 	[ -z "${iso_img}" ] && iso_img="-"
 	[ -z "${name}" ] && name="-"
 	[ -z "${profile}" ] && profile="unkpro"
@@ -382,7 +389,9 @@ show_plain()
 	local _skip_list=
 	local _basename=
 
-	case "${src}" in
+	[ -n "${oemulator}" ] && emulator="${oemulator}"
+
+	case "${emulator}" in
 		jail)
 			_skip_list="jail-freebsd-default.conf jail-freebsd-puppet.conf jail-freebsd-trusted.conf jail-freebsd-vnet.conf jail-freebsd-cbsdpuppet.conf"
 			;;
@@ -493,40 +502,27 @@ show_json()
 	done
 
 	echo "]"
-
 }
 
 
 ## MAIN
-#src="cloud"
-#src="clonos"
-#src="iso"
-
 cloud=0
 iso=0
-jail=0
 
 # cloud or iso?
 vm_filter="^is_cloud="
 
 case "${src}" in
-	"cloud")
+	cloud)
 		cloud=1
 		iso=0
-		jail=0
 		;;
 	iso)
 		cloud=0
 		iso=1
-		jail=0
-		;;
-	jail)
-		cloud=0
-		iso=0
-		jail=1
 		;;
 	*)
-		err 1 "${N1_COLOR}${CBSD_APP}: unknown filter: ${src}, valid: ${N2_COLOR}'cloud', 'iso', 'jail'${N0_COLOR}"
+		err 1 "${N1_COLOR}${CBSD_APP}: unknown filter: ${src}, valid: ${N2_COLOR}'cloud', 'iso'${N0_COLOR}"
 		;;
 esac
 
@@ -541,7 +537,18 @@ if [ ${cache_sum} -eq 1 ]; then
 	exit 0
 fi
 
-[ -z "${all_profile_path}" ] && err 0 "{}"
+if [ -z "${all_profile_path}" ]; then
+	case ${json} in
+		1)
+			err 0 "{}"
+			;;
+		*)
+			err 0 ""
+			;;
+	esac
+fi
+
+[ -n "${oemulator}" ] && emulator="${oemulator}"
 
 # first pass: select for 'iso' or 'cloud'
 for profile_path in ${all_profile_path}; do
@@ -551,7 +558,7 @@ for profile_path in ${all_profile_path}; do
 	[ $? -ne 0 ] && continue
 
 	[ -z "${is_cloud}" ] && is_cloud=0
-	[ ${cloud} -ne ${is_cloud} ] && continue
+	[ "${emulator}" != "jail" -a ${cloud} -ne ${is_cloud} ] && continue
 
 	if [ -z "${all_filtered_profile_path}" ]; then
 		all_filtered_profile_path="${profile_path}"
@@ -560,10 +567,19 @@ for profile_path in ${all_profile_path}; do
 	fi
 done
 
-[ -z "${all_filtered_profile_path}" ] && err 0 "{}"
+if [ -z "${all_filtered_profile_path}" ]; then
+	case ${json} in
+		1)
+			err 0 "{}"
+			;;
+		*)
+			err 0 ""
+			;;
+	esac
+fi
 
 #mandatory filter
-case "${src}" in
+case "${emulator}" in
 	jail)
 		vm_filter="(^long_description=|^jail_profile=|^vm_os_type=|^clonos_active=|^is_template=|^is_cloud=|^imgsize=|^imgsize_min=|^vm_ram=|^vm_cpus="
 		;;
