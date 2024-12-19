@@ -17,6 +17,10 @@ ${H3_COLOR}Examples${N0_COLOR}:
 
  # cbsd summary
 
+${H3_COLOR}See also${N0_COLOR}:
+
+ cbsd capabilities --help
+
 "
 
 . ${subrdir}/nc.subr
@@ -36,8 +40,8 @@ inc_jaillist_sum()
 
 	[ -z "${db}" ] && return 0
 
-	tmp_jaillist_sum=$( cbsdsqlro ${db} SELECT count\(jname\) FROM jails WHERE emulator != \"bhyve\" )
-	tmp_vmlist_sum=$( cbsdsqlro ${db} SELECT count\(jname\) FROM jails WHERE emulator = \"bhyve\" )
+	tmp_jaillist_sum=$( cbsdsqlro ${db} "SELECT count(jname) FROM jails WHERE emulator = 'jail'" )
+	tmp_vmlist_sum=$( cbsdsqlro ${db} "SELECT count(jname) FROM jails WHERE emulator != 'jail'" )
 
 	if ! is_number ${tmp_jaillist_sum}; then
 		jaillist_sum=$(( jaillist_sum + tmp_jaillist_sum ))
@@ -62,7 +66,7 @@ inc_hwstats_sum()
 
 	local sqldelimer=" "
 
-	eval $( cbsdsqlro ${db} SELECT ncpu,physmem,freemem,cpufreq FROM local | while read _ncpu _physmem _freemem _cpufreq; do
+	eval $( cbsdsqlro ${db} "SELECT ncpu,physmem,freemem,cpufreq FROM local" | while read _ncpu _physmem _freemem _cpufreq; do
 		echo "local tmp_ncpu=\"${_ncpu}\""
 		echo "local tmp_physmem=\"${_physmem}\""
 		echo "local tmp_freemem=\"${_freemem}\""
@@ -97,11 +101,11 @@ freemem_sum_bytes=0
 cpusum_without_freq=0
 cpufreq_sum=0
 
-nodelist=$( cbsdsqlro nodes SELECT nodename FROM nodelist )
+nodelist=$( cbsdsqlro nodes "SELECT nodename FROM nodelist" )
 
 # calculate offline nodes
 for i in ${nodelist}; do
-	node_ip=$( cbsdsqlro nodes SELECT ip FROM nodelist WHERE nodename=\"${i}\" )
+	node_ip=$( cbsdsqlro nodes "SELECT ip FROM nodelist WHERE nodename='${i}'" )
 	[ -z "${node_ip}" ] && continue
 	if ! check_locktime ${ftmpdir}/shmux_${node_ip}.lock >/dev/null 2>&1; then
 		nodelist_offline=$(( nodelist_offline + 1 ))
@@ -120,7 +124,6 @@ done
 if [ -n "${cpufreq_sum}" -a -n "${cpu_with_freq}" ]; then
 	cpufreq_average=$(( cpufreq_sum / cpu_with_freq ))
 fi
-#nodelist_sum=$( cbsdsqlro nodes SELECT count\(nodename\) FROM nodelist )
 
 if [ ${human} -eq 1 ]; then
 	if conv2human "${physmem_sum_bytes}"; then
@@ -202,77 +205,22 @@ ${ECHO} "${BOLD}  ${H5_COLOR}General node info  ${N0_COLOR}"
 ${ECHO} "${BOLD}  ${H1_COLOR}====================================  ${N0_COLOR}"
 echo
 
-bhyve_status="unavailable"
-bhyve_status_color="${N4_COLOR}"
+eval $( capabilities )
 
-jail_status="unavailable"
-jail_status_color="${N4_COLOR}"
-
-nvmm_status="unavailable"
-nvmm_status_color="${N4_COLOR}"
-
-vmm_status="unavailable"
-vmm_status_color="${N4_COLOR}"
-
-xen_status="unavailable"
-xen_status_color="${N4_COLOR}"
-
-qemu_status="unavailable"
-qemu_status_color="${N4_COLOR}"
-
-if [ -n "${BHYVE_CMD}" ]; then
-	bhyve_status="available"
-	bhyve_status_color="${N2_COLOR}"
-	bhyve_ext_help_url="https://www.bsdstore.ru/en/cbsd_bhyve_quickstart.html"
-else
-	bhyve_ext_help_url="https://www.bsdstore.ru/en/cbsd_bhyve_platform.html"
-fi
-
-if [ -n "${JAIL_CMD}" ]; then
-	jail_status="available"
-	jail_status_color="${N2_COLOR}"
-	jail_ext_help_url="https://www.bsdstore.ru/en/cbsd_jail_quickstart.html"
-else
-	jail_ext_help_url="https://www.bsdstore.ru/en/cbsd_jail_platform.html"
-fi
-
-if [ -n "${NVMMCTL_CMD}" ]; then
-	nvmm_status="available"
-	nvmm_status_color="${N2_COLOR}"
-	nvmm_ext_help_url="https://www.bsdstore.ru/en/cbsd_nvmm_quickstart.html"
-else
-	nvmm_ext_help_url="https://www.bsdstore.ru/en/cbsd_nvmm_platform.html"
-fi
-
-if [ -n "${VMM_CMD}" ]; then
-	vmm_status="available"
-	vmm_status_color="${N2_COLOR}"
-	vmm_ext_help_url="https://www.bsdstore.ru/en/cbsd_vmm_quickstart.html"
-else
-	vmm_ext_help_url="https://www.bsdstore.ru/en/cbsd_vmm_platform.html"
-fi
-if [ -n "${QEMU_SYSTEM_X86_64_CMD}" ]; then
-	qemu_status="available"
-	qemu_status_color="${N2_COLOR}"
-	qemu_system_ext_help_url="https://www.bsdstore.ru/en/cbsd_qemu_quickstart.html"
-else
-	qemu_system_ext_help_url="https://www.bsdstore.ru/en/cbsd_qemu_platform.html"
-fi
-
-if [ -n "${XL_CMD}" ]; then
-	xen_status="available"
-	xen_ext_help_url="https://www.bsdstore.ru/en/cbsd_ext_quickstart.html"
-else
-	xen_ext_help_url="https://www.bsdstore.ru/en/cbsd_xen_platform.html"
-fi
-
-printf "  ${N1_COLOR}%-15s: ${bhyve_status_color}%-16s${N0_COLOR} ( %-53s )${N0_COLOR}\n" "bhyve" ${bhyve_status} ${bhyve_ext_help_url}
-printf "  ${N1_COLOR}%-15s: ${jail_status_color}%-16s${N0_COLOR} ( %-53s )${N0_COLOR}\n" "jail" ${jail_status} ${jail_ext_help_url}
-printf "  ${N1_COLOR}%-15s: ${qemu_status_color}%-16s${N0_COLOR} ( %-53s )${N0_COLOR}\n" "qemu" ${qemu_status} ${qemu_system_ext_help_url}
-printf "  ${N1_COLOR}%-15s: ${nvmm_status_color}%-16s${N0_COLOR} ( %-53s )${N0_COLOR}\n" "nvmm" ${nvmm_status} ${nvmm_ext_help_url}
-printf "  ${N1_COLOR}%-15s: ${vmm_status_color}%-16s${N0_COLOR} ( %-53s )${N0_COLOR}\n" "vmm" ${vmm_status} ${vmm_ext_help_url}
-printf "  ${N1_COLOR}%-15s: ${xen_status_color}%-16s${N0_COLOR} ( %-53s )${N0_COLOR}\n" "xen" ${xen_status} ${xen_ext_help_url}
-
+for i in bhyve jail qemu xen virtualbox; do
+	eval bool_status="\$emulator_${i}_available"
+	eval info="\$emulator_${i}_info"
+	case "${bool_status}" in
+		1)
+			status="available"
+			status_color="${N2_COLOR}"
+			;;
+		*)
+			status="unavailable"
+			status_color="${N4_COLOR}"
+			;;
+	esac
+	printf "  ${status_color}%-11s: %-11s${N0_COLOR} ( %-53s )${N0_COLOR}\n" "${i}" ${status} ${info}
+done
 echo
-
 exit 0

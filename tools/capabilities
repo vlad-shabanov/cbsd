@@ -15,7 +15,11 @@ ${H3_COLOR}Options${N0_COLOR}:
 
 ${H3_COLOR}Examples${N0_COLOR}:
 
- # cbsd capabilities
+ # cbsd capabilities json=1
+
+${H3_COLOR}See also${N0_COLOR}:
+
+ cbsd summary --help
 
 "
 
@@ -29,79 +33,57 @@ json=0
 bhyve_status="0"
 bhyve_description="Native FreeBSD hypervisor"
 bhyve_prefix="b"
-bhyve_info="https://www.bsdstore.ru/en/cbsd_bhyve_quickstart.html"
+bhyve_info="https://github.com/cbsd/cbsd/blob/develop/share/docs/bhyve/cbsd_bhyve_quickstart.md"
 
 jail_status="0"
 jail_description="Native FreeBSD lightweight containers"
-jail_prefix="b"
-jail_info="https://www.bsdstore.ru/en/cbsd_jail_quickstart.html"
+jail_prefix="j"
+jail_info="https://github.com/cbsd/cbsd/blob/develop/share/docs/jail/cbsd_jail_quickstart.md"
 
 qemu_status="0"
 qemu_description="QEMU hypervisor"
 qemu_prefix="q"
-qemu_info="https://www.bsdstore.ru/en/cbsd_qemu_quickstart.html"
+qemu_info="https://github.com/cbsd/cbsd/blob/develop/share/docs/qemu/cbsd_qemu_quickstart.md"
 
 virtualbox_status="0"
 virtualbox_description="VirtualBox hypervisor"
 virtualbox_prefix="v"
-virtualbox_info="https://www.bsdstore.ru/en/cbsd_vbox_quickstart.html"
+virtualbox_info="https://github.com/cbsd/cbsd/blob/develop/share/docs/qemu/cbsd_virtualbox_quickstart.md"
 
 vmm_status="0"
 vmm_description="Native OpenBSD hypervisor"
 vmm_prefix="o"
-vmm_info="https://www.bsdstore.ru/en/cbsd_vmm_quickstart.html"
+vmm_info="https://github.com/cbsd/cbsd/blob/develop/share/docs/jail/cbsd_vmm_quickstart.md"
 
 xen_status="0"
 xen_description="XEN hypervisor"
-xen_prefix="b"
-xen_info="https://www.bsdstore.ru/en/cbsd_xen_quickstart.html"
-
+xen_prefix="x"
+xen_info="https://github.com/cbsd/cbsd/blob/develop/share/docs/qemu/cbsd_xen_quickstart.md"
 
 # ACCEL
 nvmm_status="0"
 kvm_status="0"
 
+bhyve_ext_help_url="https://github.com/cbsd/cbsd/blob/develop/share/docs/bhyve/cbsd_bhyve_quickstart.md"
+[ -n "${BHYVE_CMD}" ] && bhyve_status="1"
 
-if [ -n "${BHYVE_CMD}" ]; then
-	bhyve_status="1"
-	bhyve_ext_help_url="https://www.bsdstore.ru/en/cbsd_bhyve_quickstart.html"
-else
-	bhyve_ext_help_url="https://www.bsdstore.ru/en/cbsd_bhyve_quickstart.html"
-fi
+jail_ext_help_url="https://github.com/cbsd/cbsd/blob/develop/share/docs/jail/cbsd_jail_quickstart.md"
+[ -n "${JAIL_CMD}" ] && jail_status="1"
 
-if [ -n "${JAIL_CMD}" ]; then
-	jail_status="1"
-	jail_ext_help_url="https://www.bsdstore.ru/en/cbsd_jail_quickstart.html"
-else
-	jail_ext_help_url="https://www.bsdstore.ru/en/cbsd_jail_quickstart.html"
-fi
+nvmm_ext_help_url="https://github.com/cbsd/cbsd/blob/develop/share/docs/qemu/cbsd_qemu_quickstart.md#cbsd--qemu--dragonflybsd"
+[ -n "${NVMMCTL_CMD}" ] && nvmm_status="1"
 
-if [ -n "${NVMMCTL_CMD}" ]; then
-	nvmm_status="1"
-	nvmm_ext_help_url="https://www.bsdstore.ru/en/cbsd_nvmm_quickstart.html"
-else
-	nvmm_ext_help_url="https://www.bsdstore.ru/en/cbsd_nvmm_quickstart.html"
-fi
+vmm_ext_help_url="https://github.com/cbsd/cbsd/blob/develop/share/docs/jail/cbsd_vmm_quickstart.md"
+[ -n "${VMM_CMD}" ] && vmm_status="1"
 
-if [ -n "${VMM_CMD}" ]; then
-	vmm_status="1"
-	vmm_ext_help_url="https://www.bsdstore.ru/en/cbsd_vmm_quickstart.html"
-else
-	vmm_ext_help_url="https://www.bsdstore.ru/en/cbsd_vmm_quickstart.html"
-fi
+qemu_ext_help_url="https://github.com/cbsd/cbsd/blob/develop/share/docs/qemu/cbsd_qemu_quickstart.md"
+[ -n "${QEMU_SYSTEM_X86_64_CMD}" ] && qemu_status="1"
 
-if [ -n "${QEMU_SYSTEM_X86_64_CMD}" ]; then
-	qemu_status="1"
-	qemu_ext_help_url="https://www.bsdstore.ru/en/cbsd_qemu_quickstart.html"
-else
-	qemu_ext_help_url="https://www.bsdstore.ru/en/cbsd_qemu_quickstart.html"
-fi
+xen_ext_help_url="https://github.com/cbsd/cbsd/blob/develop/share/docs/qemu/cbsd_xen_quickstart.md"
+[ -n "${XL_CMD}" ] && xen_status="1"
 
-if [ -n "${XL_CMD}" ]; then
-	xen_status="1"
-else
-	xen_ext_help_url="https://www.bsdstore.ru/en/cbsd_xen_quickstart.html"
-fi
+virtualbox_ext_help_url="https://github.com/cbsd/cbsd/blob/develop/share/docs/qemu/cbsd_virtualbox_quickstart.md"
+[ -n "${VIRTUALBOX_CMD}" ] && virtualbox_status="1"
 
 _cap_count_total=0
 _cap_count_available=0
@@ -126,7 +108,6 @@ for i in bhyve jail qemu virtualbox vmm xen; do
 	eval _prefix=\${${i}_prefix}
 	eval _info=\${${i}_info}
 	[ -z "${_status}" ] && _status="0"
-
 
 	case "${_status}" in
 		0)
@@ -161,7 +142,6 @@ emulator_${i}_description="${_description}"
 emulator_${i}_info="${_info}"
 EOF
 	fi
-
 done
 
 [ "${json}" = "1" ] && echo "]"
