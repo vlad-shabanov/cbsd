@@ -175,6 +175,47 @@ init_iso()
 			full_list_iso_desc="${iso_site_local}"
 		else
 			for i in ${iso_site_local} ${iso_site} ${cbsd_iso_mirrors}; do
+				# check if INDEX url? checkout https://github.com/cbsd/mirrors
+				_ext=${i##*.}
+				if [ "${_ext}" = "txt" ]; then
+					_res=$( ${TIMEOUT_CMD} -s KILL 4 ${SU_CMD} -m nobody -c "/usr/local/cbsd/bin/cfetch -u ${i} -o /tmp/indexfetch.$$.list" 2>&1 )
+					_ret=$?
+
+					if [ ${_ret} -ne 0 ]; then
+						${ECHO} "${W1_COLOR}warning: ${N1_COLOR}failed to fetch mirror index file: ${N2_COLOR}${i}${N0_COLOR}"
+						[ -r /tmp/indexfetch.$$.list ] && ${RM_CMD} /tmp/indexfetch.$$.list
+						continue
+					fi
+
+					if [ ! -r /tmp/indexfetch.$$.list ]; then
+						${ECHO} "${W1_COLOR}warning: ${N1_COLOR}failed to read mirror index file for: ${N2_COLOR}${i}${N0_COLOR}"
+						continue
+					fi
+
+					_res=$( ${GREP_CMD} -v '^#' /tmp/indexfetch.$$.list | ${GREP_CMD} '|' | ${TR_CMD} '|' ' ' | while read _x _y; do
+						_proto_pref=$( substr --pos=0 --len=3 --str="${_x}" )
+						case "${_proto_pref}" in
+							htt|ftp)
+								true
+								;;
+							*)
+								${ECHO} "${W1_COLOR}warning: ${N1_COLOR}invalid schema [${_proto_pref}]: ${N2_COLOR}${_x}${N0_COLOR}" 1>&2
+								continue
+								;;
+						esac
+						printf "${_x} "
+					done )
+
+					[ -r /tmp/indexfetch.$$.list ] && ${RM_CMD} /tmp/indexfetch.$$.list
+
+					if [ -n "${full_list_iso_site}" ]; then
+						full_list_iso_site="${full_list_iso_site} ${_res}"
+					else
+						full_list_iso_site="${_res}"
+					fi
+					continue
+				fi
+
 				if [ -n "${full_list_iso_site}" ]; then
 					full_list_iso_site="${full_list_iso_site} ${i}"
 				else

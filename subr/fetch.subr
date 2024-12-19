@@ -137,7 +137,7 @@ fetchme()
 					_res=$?
 					;;
 				*)
-					${LOCKF_CMD} -s -t0 ${_out}.lock ${FETCH_CMD} ${fetch_opts} -o ${_out} ${_url} ${_TONULL}
+					${LOCKF_CMD} -s -t0 ${_out}.lock ${bindir}/cfetch -u ${_url} -o ${_out}
 					_res=$?
 					;;
 			esac
