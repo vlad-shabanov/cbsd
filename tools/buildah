@@ -103,7 +103,7 @@ ${ECHO} "${N1_COLOR}Buildah integration for CBSD enabled, direct usage string:${
 ${ECHO} "${N2_COLOR}  env XDG_CONFIG_HOME=\"${workdir}/.config\" ${BUILDAH_CMD} --root ${workdir}/basejail/buildah <args>${N0_COLOR}"
 ${ECHO} "${N1_COLOR}The FreeBSD port of the Buildah image building tool is experimental and should be used for evaluation and testing purposes only.${N0_COLOR}"
 if [ ${zfsfeat} -eq 0 ]; then
-	${GREP_CMD} -q "^driver =" /usr/local/etc/containers/storage.conf | ${GREP_CMD} -q vfs
+	${GREP_CMD} "^driver =" /usr/local/etc/containers/storage.conf | ${GREP_CMD} -q vfs
 	_ret=$?
 	if [ ${_ret} -ne 0 ]; then
 		${ECHO} "${W1_COLOR}Warning: ${N1_COLOR}zfs_feature off. Please re-configure 'storage.conf' to use the vfs driver:${N0_COLOR}"
