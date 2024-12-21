@@ -238,8 +238,14 @@ init() {
 		_postfix=$( substr --pos=${_arg_len} --len=1 --str="${i}" )
 		strpos --str="${i}" --search="\""
 		_pos=$?
-		[ ${_pos} -ne 0 ] && _pos=$(( _pos + 1 ))
-		if [ "${_postfix}" = "\"" ]; then
+		if [ ${_pos} -ne 0 ]; then
+			_pos=$(( _pos + 1 ))
+		else
+			strpos --str="${i}" --search="'"
+			_pos=$?
+			[ ${_pos} -ne 0 ] && _pos=$(( _pos + 1 ))
+		fi
+		if [ "${_postfix}" = "\"" -o "${_postfix}" = "'" ]; then
 			# closed \"
 			# if first " pos matches the end of the line, 
 			# so this is the closure of a multi-line variable
@@ -269,7 +275,7 @@ init() {
 		else
 			VAL=$( substr --pos=$(( 0 )) --len=${_arg_len} --str="${i}" )
 		fi
-		VAL=$( echo ${VAL} | ${TR_CMD} -d '"' )		# strip extra quotes
+		VAL=$( echo ${VAL} | ${TR_CMD} -d "\"''" )		# strip extra quotes
 #		VAL=$( echo ${VAL} | ${TR_CMD} -d "'" )		# strip extra quotes
 
 		if [ ${_opened} -eq 1 -o ${_closed} -eq 1 ]; then
