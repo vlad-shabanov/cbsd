@@ -62,6 +62,8 @@ create_env()
 		is_power_on="true"
 	fi
 
+	attach_cmd=
+
 	# extras area
 	v6_addr=
 	v4_addr="${ssh_host}"
@@ -73,6 +75,7 @@ create_env()
 	case "${emulator}" in
 		jail)
 			type="container"
+			attach_cmd="/usr/local/bin/sudo /usr/local/bin/cbsd jlogin jname=${jname}"
 			;;
 		*)
 			type="vm"
@@ -219,6 +222,11 @@ create_env()
   "image": "${image}",
 EOF
 
+if [ -n "${attach_cmd}" ]; then
+${CAT_CMD} >> ${json_tmp} <<EOF
+  "attach_cmd": "${attach_cmd}",
+EOF
+fi
 if [ -n "${ssh_user}" ]; then
 ${CAT_CMD} >> ${json_tmp} <<EOF
   "ssh_user": "${ssh_user}",
@@ -352,6 +360,7 @@ imgsize_bytes="${imgsize_bytes}"
 imgsize="${imgsize}"
 vm_os_type="${vm_os_type}"
 vm_os_profile="${vm_os_profile}"
+attach_cmd="${attach_cmd}"
 ssh_user="${ssh_user}"
 ssh_host="${ssh_host}"
 ssh4_host="${ssh4_host}"
