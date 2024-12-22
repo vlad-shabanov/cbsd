@@ -334,8 +334,14 @@ remove_data_dir()
 				*)
 					;;
 			esac
-			unmountdata ${_data}
-			${ZFS_CMD} list ${ZPOOL}/${jname} >/dev/null 2>/dev/null
+
+			DATA_ZPOOL=""
+			unmountdata ${_data} --keep-DATA_ZPOOL
+			if [ -z "${DATA_ZPOOL}" ] ; then
+				DATA_ZPOOL=${ZPOOL}/${jname}
+			fi
+
+			${ZFS_CMD} list ${DATA_ZPOOL} >/dev/null 2>/dev/null
 			if [ $? -eq 0 ]; then
 				# sometimes these errors happen:
 				# cannot unmount 'XXX': pool or dataset is busy
@@ -348,14 +354,16 @@ remove_data_dir()
 						# fstat/processes?
 						${UMOUNT_CMD} -f ${_data} 2>/dev/null
 					fi
-					${ZFS_CMD} destroy ${ZPOOL}/${jname}
-					${ZFS_CMD} list ${ZPOOL}/${jname} >/dev/null 2>/dev/null
+					${ZFS_CMD} destroy ${DATA_ZPOOL}
+					${ZFS_CMD} list ${DATA_ZPOOL} >/dev/null 2>/dev/null
 					[ $? -ne 0 ] && break
-					${ECHO} "${N1_COLOR}${CBSD_APP}: cannot destroy ${ZPOOL}/${jname} (${_data}), retry: ${N2_COLOR}${_retry}/${_max_retry}${N0_COLOR}" 1>&2
+					${ECHO} "${N1_COLOR}${CBSD_APP}: cannot destroy ${DATA_ZPOOL} (${_data}), retry: ${N2_COLOR}${_retry}/${_max_retry}${N0_COLOR}" 1>&2
 					sleep 1
 					_retry=$(( _retry + 1 ))
 				done
 			fi
+
+			unset DATA_ZPOOL
 		fi
 	elif [ "${hammerfeat}" = "1" ]; then
 		destroy_hammer_fs ${jname}
@@ -386,6 +394,9 @@ unmountdata()
 	# store and restore old ZPOOL value after zfsmnt
 	OZPOOL="${ZPOOL}"
 	zfsmnt ${_data}
+	if [ -n "${2}" ] ; then
+		DATA_ZPOOL=${ZPOOL}
+	fi
 	ZPOOL="${OZPOOL}"
 
 	if [ $? -eq 1 ]; then
@@ -401,7 +412,7 @@ create_fs()
 	[ -z "${data}" ] && return 1
 
 	if [ "${zfsfeat}" = "1" ]; then
-		create_zfs_fs -d ${data}
+		create_zfs_fs -d ${data} -Z "${zfs_dataset}"
 	elif [ "${hammerfeat}" = "1" ]; then
 		create_hammer_fs ${jname}
 	else
@@ -416,18 +427,20 @@ create_fs()
 # -n - jail_name
 # -p promote fs ( 0 or 1 )
 # -z zfs_snapsrc
+# -Z ZFS dataset location
 create_zfs_fs()
 {
-	local _data _mount_point _name _promote _zfs_snapsrc _ret
+	local _data _mount_point _name _promote _zfs_snapsrc _zfs_dataset _ret
 	local _cmd
 
-	while getopts "d:m:n:p:z:" opt; do
+	while getopts "d:m:n:p:z:Z:" opt; do
 		case "${opt}" in
 			d) _data="${OPTARG}" ;;
 			m) _mount_point="${OPTARG}" ;;
 			n) _name="${OPTARG}" ;;
 			p) _promote="${OPTARG}" ;;
 			z) _zfs_snapsrc="${OPTARG}" ;;
+			Z) _zfs_dataset="${OPTARG}" ;;
 		esac
 		shift $(($OPTIND - 1))
 	done
@@ -439,12 +452,17 @@ create_zfs_fs()
 	[ -n "${zfs_snapsrc}" ] && _zfs_snapsrc="${zfs_snapsrc}"
 	[ -z "${_promote}" ] && _promote=0
 
-	local ZPOOL
+	local ZPOOL ZDATASET
+	if [ -n "$_zfs_dataset" ] ; then
+		ZDATASET="${_zfs_dataset}"
+		ZPOOL=`echo ${_zfs_dataset} | ${SED_CMD} -e 's#/[^/]$##'`
+	else
+		ZPOOL=$( ${ZFS_CMD} get -Ho value name ${jaildatadir} )
+		ZDATASET=${ZPOOL}/${_name}
+	fi
 
-	ZPOOL=$( ${ZFS_CMD} get -Ho value name ${jaildatadir} )
-
-	if zfsroot ${_name}; then
-		log_err 1 "create_zfs_fs: ${ZPOOL}/${_name} already in use"
+	if zfsroot ${ZDATASET}; then
+		log_err 1 "create_zfs_fs: ${ZDATASET} already in use"
 	fi
 
 	# encrypt
@@ -470,33 +488,33 @@ create_zfs_fs()
 
 	if [ -z "${_zfs_snapsrc}" ]; then
 		if [ -z "${_encrypt_args}" ]; then
-			_cmd="${ZFS_CMD} create ${zfs_create_flags} -o mountpoint=${_data} ${ZPOOL}/${_name}"
+			_cmd="${ZFS_CMD} create ${zfs_create_flags} -o mountpoint=${_data} ${ZDATASET}"
 			res=$( ${_cmd} 2>&1 )
 			_ret=$?
 			cbsdlogger NOTICE ${CBSD_APP}: create_zfs_fs errcode: ${_ret}: ${_cmd}
 		else
-			_cmd="${ZFS_CMD} create ${zfs_create_flags} -o mountpoint=${_data} ${_encrypt_args} ${ZPOOL}/${_name}"
+			_cmd="${ZFS_CMD} create ${zfs_create_flags} -o mountpoint=${_data} ${_encrypt_args} ${ZDATASET}"
 			${_cmd}
 			_ret=$?
 			cbsdlogger NOTICE ${CBSD_APP}: create_zfs_fs errcode: ${_ret}: ${_cmd}
 		fi
 		[ ${_ret} -ne 0 ] && log_err 1 "${N1_COLOR}create_zfs_fs: zfs create failed: ${res}. No ZFS and zfsfeat=1?${N0_COLOR}"
-		cbsdlogger NOTICE ${CBSD_APP}: create_zfs_fs: ZFS ${ZPOOL}/${_name} has been created with mountpoint: ${_data}, opt: ${zfs_create_flags}
+		cbsdlogger NOTICE ${CBSD_APP}: create_zfs_fs: ZFS ${ZDATASET} has been created with mountpoint: ${_data}, opt: ${zfs_create_flags}
 	else
-		_cmd=$( ${ZFS_CMD} clone -p ${_zfs_snapsrc} ${ZPOOL}/${_name} )
+		_cmd=$( ${ZFS_CMD} clone -p ${_zfs_snapsrc} ${ZDATASET} )
 		res=$( ${_cmd} 2>&1 )
 		_ret=$?
 		[ ${_ret} -ne 0 ] && log_err 1 "${N1_COLOR}create_zfs_fs: zfs clone failed, code: ${_ret}: ${res}${N0_COLOR}"
-		cbsdlogger NOTICE ${CBSD_APP}: ZFS cloned: ${_zfs_snapsrc} to ${ZPOOL}/${_name}
+		cbsdlogger NOTICE ${CBSD_APP}: ZFS cloned: ${_zfs_snapsrc} to ${ZDATASET}
 
 		if [ "${_mount_point}" != "none" ]; then
 			if [ -n "${_mount_point}" ]; then
-				_cmd=$( ${ZFS_CMD} set mountpoint=${_mount_point} ${ZPOOL}/${_name} )
+				_cmd=$( ${ZFS_CMD} set mountpoint=${_mount_point} ${ZDATASET} )
 				${_cmd}
 				_ret=$?
 				cbsdlogger NOTICE ${CBSD_APP}: create_zfs_fs errcode: ${_ret}: ${_cmd}
 			else
-				_cmd=$( ${ZFS_CMD} set mountpoint=${_data} ${ZPOOL}/${_name} )
+				_cmd=$( ${ZFS_CMD} set mountpoint=${_data} ${ZDATASET} )
 				${_cmd}
 				_ret=$?
 				cbsdlogger NOTICE ${CBSD_APP}: create_zfs_fs errcode: ${_ret}: ${_cmd}
@@ -526,9 +544,9 @@ create_zfs_fs()
 	esac
 
 	if [ ${_promote} -eq 1 ]; then
-		${ECHO} "${N1_COLOR}ZFS promoting for: ${N2_COLOR}${ZPOOL}/${_name}${N0_COLOR}"
-		cbsdlogger NOTICE ${CBSD_APP}: zfs promoting for: ${ZPOOL}/${_name}
-		${ZFS_CMD} promote ${ZPOOL}/${_name}
+		${ECHO} "${N1_COLOR}ZFS promoting for: ${N2_COLOR}${ZDATASET}${N0_COLOR}"
+		cbsdlogger NOTICE ${CBSD_APP}: zfs promoting for: ${ZDATASET}
+		${ZFS_CMD} promote ${ZDATASET}
 	fi
 
 	return 0

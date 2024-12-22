@@ -64,9 +64,18 @@ getmnt() {
 # fi
 zfsroot() {
 	[ -z "$1" ] && return 0
+	local _pattern
+	case $1 in
+		*/*) 
+			_pattern="${1}"
+			;;
+		*)
+			_pattern="${ZPOOL}/${1}"
+			;;
+	esac
 
 	${ZFS_CMD} list -H -o name | while read _mnt; do
-		[ "$_mnt" = "${ZPOOL}/${1}" ] && exit 0
+		[ "$_mnt" = "${_pattern}" ] && exit 0
 	done
 
 	return $?
